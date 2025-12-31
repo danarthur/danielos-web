@@ -3,6 +3,8 @@
 import { useMemo } from 'react'
 import ForceGraph3D from 'react-force-graph-3d'
 
+type Link = { source: number; target: number }
+
 export default function NeuralNetwork() {
   // 1. Generate Static Mock Data (prevents hydration mismatch)
   const data = useMemo(() => {
@@ -12,7 +14,7 @@ export default function NeuralNetwork() {
       val: Math.random() * 20
     }))
 
-    const links = []
+    const links: Link[] = []
     nodes.forEach(node => {
       // Connect to 2-3 random other nodes
       const numConnections = Math.floor(Math.random() * 3) + 2
