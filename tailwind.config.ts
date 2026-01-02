@@ -13,15 +13,14 @@ const config: Config = {
         stone: '#171717',
         subtle: '#262626',
         muted: '#a3a3a3',
-        cream: '#d4c4a8',
+        cream: '#d4c4a8', // The Japandi Gold
       },
+      // Crucial for the background gradients
       backgroundImage: {
-        cinematic: 'radial-gradient(circle at center, transparent 0%, #0a0a0a 100%)',
+        'cinematic': 'radial-gradient(circle at top, #171717 0%, #0a0a0a 100%)',
       },
     },
   },
   plugins: [],
 }
-
 export default config
-

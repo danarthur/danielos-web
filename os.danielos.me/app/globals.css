@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-void: #0a0a0a;
+  --color-stone: #171717;
+  --color-subtle: #262626;
+  --color-muted: #a3a3a3;
+  --color-cream: #d4c4a8;
+}
+
+@layer base {
+  /* FIX 1: Remove the * selector that adds borders to everything */
+  * {
+    /* Keep color variable, but don't force width */
+    border-color: var(--border);
+  }
+  
+  body {
+    background-color: #0a0a0a; /* Force bg-void */
+    color: #a3a3a3; /* Force text-muted */
+    height: 100vh; /* Lock viewport */
+    width: 100vw;
+    overflow: hidden; /* Prevent window scroll */
+  }
+}
+
+/* FIX 2: Add these utilities if Tailwind < v4 */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom Scrollbar for the Chat Area */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
