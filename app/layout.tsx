@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "next-themes";
-import { Shell } from "@/components/layout/Shell";
-import { SITE_CONFIG } from "@/lib/constants";
-
+import { Toaster } from "@/components/ui/sonner";
+import ArthurVoice from "../components/voice/ArthurVoice";
+import { SessionProvider } from "../components/context/SessionContext";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -17,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: SITE_CONFIG.title,
-  description: SITE_CONFIG.description,
+  title: "DanielOS",
+  description: "High-Performance Neural Interface",
 };
 
 export default function RootLayout({
@@ -27,15 +26,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#050505] text-stone-400 h-screen w-screen overflow-hidden`}
       >
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-          <Shell>
+          <SessionProvider>
+            {/* Now the Chat and ArthurVoice share the same memory */}
             {children}
-          </Shell>
-          <Toaster />
+            <Toaster />
+            <ArthurVoice />
+          </SessionProvider>
         </ThemeProvider>
       </body>
     </html>
