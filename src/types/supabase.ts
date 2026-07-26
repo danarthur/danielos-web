@@ -2434,6 +2434,7 @@ export type Database = {
       get_public_invoice: {
         Args: { p_token: string }
         Returns: {
+          accept_online_payments: boolean
           bill_to_snapshot: Json
           currency: string
           discount_amount: number
@@ -2453,6 +2454,7 @@ export type Database = {
           tax_amount: number
           terms: string
           total_amount: number
+          workspace_id: string
         }[]
       }
       invoices_needing_reminder: {
@@ -7777,6 +7779,7 @@ export type Database = {
       }
       workspaces: {
         Row: {
+          accept_online_payments: boolean
           aion_actions_reset_at: string | null
           aion_actions_used: number
           aion_config: Json
@@ -7820,6 +7823,7 @@ export type Database = {
           trial_ends_at: string | null
         }
         Insert: {
+          accept_online_payments?: boolean
           aion_actions_reset_at?: string | null
           aion_actions_used?: number
           aion_config?: Json
@@ -7863,6 +7867,7 @@ export type Database = {
           trial_ends_at?: string | null
         }
         Update: {
+          accept_online_payments?: boolean
           aion_actions_reset_at?: string | null
           aion_actions_used?: number
           aion_config?: Json

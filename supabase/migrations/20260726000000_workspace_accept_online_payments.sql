@@ -1,13 +1,22 @@
 -- =============================================================================
 -- Add workspaces.accept_online_payments flag + extend get_public_invoice.
 --
+-- Applied to prod (wlhmgtnelqhzqyrphadd) 2026-07-26 via MCP. This migration was
+-- authored during the 2026-04-12 billing rebuild but was orphaned in
+-- migrations/pre-baseline/ and never reached the live DB, so the public invoice
+-- "Pay now" button was permanently disabled for every workspace (the RPC did
+-- not return accept_online_payments, and the page fell back to `?? false`).
+-- See docs/audits/owner-walkthrough-2026-07-26.md, Slice 5.
+--
+-- Lives in the main migrations folder (not pre-baseline) so a fresh-DB rebuild
+-- — supabase start / supabase test db in CI — matches prod. Idempotent:
+-- ADD COLUMN IF NOT EXISTS + CREATE OR REPLACE FUNCTION, safe to re-run.
+--
 -- The flag gates the public invoice "Pay now" button. When false (default),
 -- clients see a fallback message asking them to contact the sender. When true,
--- clients can pay via Stripe Checkout.
---
--- Safer rollout: workspaces opt in once they confirm their Stripe Connect /
--- payout setup. Without it, enabling Stripe globally would route payments
--- before workspaces have validated their account.
+-- clients can pay via Stripe Checkout. Workspaces opt in once they confirm their
+-- Stripe Connect / payout setup, so enabling Stripe globally never routes
+-- payments before a workspace has validated its account.
 -- =============================================================================
 
 ALTER TABLE public.workspaces
@@ -24,10 +33,6 @@ COMMENT ON COLUMN public.workspaces.accept_online_payments IS
 -- The Pay button needs:
 --   * workspace_id — to scope the Stripe Checkout session and webhook routing
 --   * accept_online_payments — to gate whether the button renders at all
---
--- Adding both as new columns on the existing RETURNS TABLE preserves the
--- existing column ordering for callers that destructure positionally (none
--- known) and keeps the RPC's STABLE-with-side-effects pattern intact.
 -- =============================================================================
 
 DROP FUNCTION IF EXISTS finance.get_public_invoice(text);
