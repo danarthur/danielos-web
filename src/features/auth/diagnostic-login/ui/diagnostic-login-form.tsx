@@ -88,7 +88,7 @@ export function DiagnosticLoginForm() {
               disabled={isPending}
               className="w-full px-4 py-3 rounded-xl
                 bg-[var(--stage-text-primary)]/5 border border-[oklch(1_0_0_/_0.08)]
-                text-[var(--stage-text-primary)]placeholder:text-[var(--stage-text-secondary)]/50
+                text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/50
                 focus:outline-none focus-visible:border-[oklch(1_0_0_/_0.15)] focus-visible:ring-2 focus-visible:ring-[var(--stage-text-primary)]/5
                 disabled:opacity-45 disabled:cursor-not-allowed
                 transition-colors duration-[80ms]"
@@ -111,7 +111,7 @@ export function DiagnosticLoginForm() {
                 disabled={isPending}
                 className="w-full px-4 py-3 pr-12 rounded-xl
                   bg-[var(--stage-text-primary)]/5 border border-[oklch(1_0_0_/_0.08)]
-                  text-[var(--stage-text-primary)]placeholder:text-[var(--stage-text-secondary)]/50
+                  text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/50
                   focus:outline-none focus-visible:border-[oklch(1_0_0_/_0.15)] focus-visible:ring-2 focus-visible:ring-[var(--stage-text-primary)]/5
                   disabled:opacity-45 disabled:cursor-not-allowed
                   transition-colors duration-[80ms]"

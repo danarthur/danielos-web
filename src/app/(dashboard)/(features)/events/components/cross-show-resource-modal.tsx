@@ -366,11 +366,11 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                         className="relative"
                       >
                         <div
-                          className={cn(
-                            'px-5 py-2.5 flex items-center gap-3',
-                            isConflict && 'bg-[color-mix(in_oklch,var(--color-unusonic-error)_5%,transparent)]',
-                          )}
-                          style={isConflict ? { borderLeft: '3px solid var(--color-unusonic-error)' } : undefined}
+                          className="px-5 py-2.5 flex items-center gap-3"
+                          style={isConflict ? {
+                            borderLeft: '3px solid var(--color-unusonic-error)',
+                            backgroundColor: 'color-mix(in oklch, var(--color-unusonic-error) 5%, transparent)',
+                          } : undefined}
                         >
                           {/* Name + role */}
                           <div className="flex-1 min-w-0">
@@ -579,11 +579,11 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                           initial={{ opacity: 0, y: 4 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={STAGE_LIGHT}
-                          className={cn(
-                            'px-5 py-2.5 flex items-center gap-3',
-                            isConflict && 'bg-[color-mix(in_oklch,var(--color-unusonic-error)_5%,transparent)]',
-                          )}
-                          style={isConflict ? { borderLeft: '3px solid var(--color-unusonic-error)' } : undefined}
+                          className="px-5 py-2.5 flex items-center gap-3"
+                          style={isConflict ? {
+                            borderLeft: '3px solid var(--color-unusonic-error)',
+                            backgroundColor: 'color-mix(in oklch, var(--color-unusonic-error) 5%, transparent)',
+                          } : undefined}
                         >
                           {/* Name + quantity */}
                           <div className="flex-1 min-w-0">

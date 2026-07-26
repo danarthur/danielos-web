@@ -299,8 +299,10 @@ export function Prism({
   // change patches the cached bundle, the bundle's deal.status updates
   // immediately — selectedItem.status doesn't until the gigs query refetches.
   // Reading from the bundle keeps the handover banner in sync with the pill.
-  const dealSignedOrDeposit =
-    isDeal && deal?.status && ['contract_signed', 'deposit_received', 'won'].includes(deal.status);
+  // deals_status_check limits status to ('working','won','lost'), so 'won' is
+  // the only value that gates the handover banner. (Prior 'contract_signed' /
+  // 'deposit_received' slugs were stale — the constraint made them unreachable.)
+  const dealSignedOrDeposit = isDeal && deal?.status === 'won';
 
   // Auto-pick the most useful default lens once per new selection. Use a ref
   // so subsequent bundle re-fetches (after mutations) don't override a lens

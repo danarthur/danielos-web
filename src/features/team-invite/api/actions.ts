@@ -779,20 +779,28 @@ export async function resendInviteAction(
     return { ok: false, error: 'Failed to refresh invitation.' };
   }
 
-  // Resolve workspace for email sending
-  const { data: workspace } = await supabase
-    .from('workspaces')
-    .select('id, name')
-    .eq('id', invitation.organization_id)
-    .maybeSingle();
+  // Resolve workspace for email sending. invitation.organization_id holds a
+  // legacy_org_id, not workspaces.id — resolve through getOrgDetails (which
+  // matches on id OR legacy_org_id) to get the real workspace_id, exactly as
+  // deployInvites does. A direct .eq('id', organization_id) lookup returns
+  // null and silently drops the email while still reporting { ok: true }.
+  const org = await getOrgDetails(invitation.organization_id);
+  const workspaceId = org?.workspace_id ?? null;
 
-  if (workspace) {
+  if (workspaceId) {
+    const { data: ws } = await supabase
+      .from('workspaces')
+      .select('name')
+      .eq('id', workspaceId)
+      .maybeSingle();
+    const workspaceName = (ws as { name?: string } | null)?.name ?? org?.name ?? 'your team';
+
     const payload = (invitation.payload ?? {}) as Record<string, unknown>;
     await sendEmployeeInviteEmail({
       to: invitation.email,
       token: newToken,
-      workspaceId: workspace.id,
-      workspaceName: workspace.name ?? 'your team',
+      workspaceId,
+      workspaceName,
       inviterName: (payload.inviterName as string) ?? null,
     }).catch(() => {
       // Email failure is non-fatal; the new token is still valid

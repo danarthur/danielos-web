@@ -504,13 +504,16 @@ function PayFieldsSection({ rowId, dayRate, travelStipend, perDiem, kitFee }: {
 
   const handleSave = async () => {
     setSaving(true);
-    await updateCrewDispatch(rowId, {
+    const result = await updateCrewDispatch(rowId, {
       day_rate: base ? Number(base) : null,
       travel_stipend: travel ? Number(travel) : null,
       per_diem: diem ? Number(diem) : null,
       kit_fee: kit ? Number(kit) : null,
     } as Parameters<typeof updateCrewDispatch>[1]);
     setSaving(false);
+    if (!result.success) {
+      toast.error(result.error);
+    }
   };
 
   return (
