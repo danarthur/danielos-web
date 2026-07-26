@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,7 +9,7 @@ import { DetailPaneTransition } from '@/shared/ui/detail-pane-transition';
 import { LensCrossfade } from '@/shared/ui/lens-crossfade';
 import { ChevronLeft, ChevronDown, Check, FileText, ExternalLink, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { handoverDeal } from '../actions/handover-deal';
+import { HandoffWizard } from './handoff-wizard';
 import { updateDealStatus, type DealStatus } from '../actions/update-deal-status';
 import { getWorkspacePipelineStages, type WorkspacePipelineStage } from '../actions/get-workspace-pipeline-stages';
 import type { PrismBundle, PrismBundleSource } from '../actions/get-prism-bundle';
@@ -231,7 +231,7 @@ export function Prism({
   sourceOrgId = null,
 }: PrismProps) {
   const [lens, setLens] = useState<PrismLens>('deal');
-  const [handingOver, startHandover] = useTransition();
+  const [bannerHandoffOpen, setBannerHandoffOpen] = useState(false);
   const [handoverJustDone, setHandoverJustDone] = useState(false);
   const [linkedProposalUrl, setLinkedProposalUrl] = useState<string | null>(null);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
@@ -441,19 +441,7 @@ export function Prism({
     }
   };
 
-  const handleHandover = () => {
-    if (!selectedId || !isDeal) return;
-    startHandover(async () => {
-      const result = await handoverDeal(selectedId);
-      if (result.success) {
-        handleHandoverSuccess(result.eventId);
-      } else {
-        toast.error(result.error ?? 'Failed to hand over deal');
-      }
-    });
-  };
-
-  /** Shared success path: invalidate the bundle so deal + event summary re-resolve, run border animation, switch to Plan lens. Used after direct handover (Deal tab) or after HandoffWizard completes. */
+  /** Shared success path: invalidate the bundle so deal + event summary re-resolve, run border animation, switch to Plan lens. Used after the HandoffWizard completes (from the Deal-tab banner or the Plan-tab confirm strip). */
   const handleHandoverSuccess = (_eventId: string) => {
     setHandoverJustDone(true);
     queryClient.invalidateQueries({ queryKey: bundleQueryConfig.queryKey });
@@ -768,12 +756,11 @@ export function Prism({
               </div>
               <button
                 type="button"
-                onClick={handleHandover}
-                disabled={handingOver}
-                className="stage-btn stage-btn-primary shrink-0 flex items-center gap-2 disabled:opacity-45 disabled:pointer-events-none"
+                onClick={() => setBannerHandoffOpen(true)}
+                className="stage-btn stage-btn-primary shrink-0 flex items-center gap-2"
               >
-                {handingOver ? 'Handing over…' : 'Hand over to production'}
-                {!handingOver && <ArrowRight size={16} aria-hidden />}
+                Hand over to production
+                <ArrowRight size={16} aria-hidden />
               </button>
             </motion.div>
           )}
@@ -979,6 +966,27 @@ export function Prism({
         submitting={statusChanging}
       />
     )}
+    {/* Deal-tab handover banner routes through the HandoffWizard (same flow as
+        the Plan-tab confirm strip) so it collects the client and hard-blocks a
+        null ops.events.client_entity_id — which would make the event invisible
+        to the client portal. Rendered at the fragment root (not inside a
+        transformed motion.div) so the fixed overlay positions against the
+        viewport. */}
+    <AnimatePresence>
+      {bannerHandoffOpen && deal && selectedId && isDeal && (
+        <HandoffWizard
+          key="banner-handoff-wizard"
+          dealId={selectedId}
+          deal={deal}
+          stakeholders={stakeholders}
+          onSuccess={(eventId) => {
+            setBannerHandoffOpen(false);
+            handleHandoverSuccess(eventId);
+          }}
+          onDismiss={() => setBannerHandoffOpen(false)}
+        />
+      )}
+    </AnimatePresence>
     </>
   );
 }
