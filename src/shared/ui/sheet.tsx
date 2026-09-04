@@ -8,21 +8,8 @@ import { cn } from '@/shared/lib/utils';
 import { useModalLayer } from '@/shared/lib/use-modal-layer';
 import { STAGE_HEAVY } from '@/shared/lib/motion-constants';
 import { Button } from '@/shared/ui/button';
+import { SheetContext, useSheet, SheetTitleIdContext } from './sheet-context';
 
-interface SheetContextValue {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}
-
-const SheetContext = React.createContext<SheetContextValue | null>(null);
-
-function useSheet() {
-  const ctx = React.useContext(SheetContext);
-  if (!ctx) throw new Error('Sheet components must be used within Sheet');
-  return ctx;
-}
-
-const SheetTitleIdContext = React.createContext<string | undefined>(undefined);
 
 interface SheetProps {
   open?: boolean;

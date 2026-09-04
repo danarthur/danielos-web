@@ -20,7 +20,6 @@ import {
   CompanyAttrsSchema,
   VenueAttrsSchema,
 } from '@/shared/lib/entity-attrs';
-import { COMPANY_ATTR } from '@/entities/directory/model/attribute-keys';
 import {
   readEntityAddress,
   buildAddressPatch,
@@ -38,7 +37,71 @@ function toKind(entityType: string | null | undefined): QuickEditKind | null {
 }
 
 function str(v: unknown): string {
-  return typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number') return String(v);
+  return '';
+}
+
+/** Venue address lives in flat attribute keys rather than a `group: 'address'` field. */
+const ADDRESS_KEYS = new Set(['street', 'city', 'state', 'postal_code']);
+
+const SCHEMA_BY_KIND = {
+  venue: VenueAttrsSchema,
+  company: CompanyAttrsSchema,
+  person: PersonAttrsSchema,
+} as const;
+
+/**
+ * Current form values for one entity.
+ *
+ * Address fields resolve through readEntityAddress so whatever the contact
+ * page (or Aion, or an import) stored shows up here -- otherwise the form
+ * would open blank and a save would blank the record.
+ */
+function buildQuickEditValues(
+  kind: QuickEditKind,
+  attributes: unknown,
+): Record<string, string> {
+  const address = readEntityAddress((attributes ?? {}) as Record<string, unknown>);
+  // readEntityAttrs is overloaded on the literal kind, so it cannot take the union.
+  let attrs: Record<string, unknown>;
+  if (kind === 'venue') {
+    attrs = readEntityAttrs(attributes, 'venue') as Record<string, unknown>;
+  } else if (kind === 'company') {
+    attrs = readEntityAttrs(attributes, 'company') as Record<string, unknown>;
+  } else {
+    attrs = readEntityAttrs(attributes, 'person') as Record<string, unknown>;
+  }
+  const values: Record<string, string> = {};
+
+  for (const f of QUICK_EDIT_FIELDS[kind]) {
+    const isAddress =
+      f.group === 'address' || (kind === 'venue' && ADDRESS_KEYS.has(f.key));
+    values[f.key] = isAddress
+      ? address[f.key as keyof EntityAddress]
+      : str(attrs[f.key]);
+  }
+  return values;
+}
+
+/** Split submitted values into a plain attribute patch and address edits. */
+function splitQuickEditValues(
+  kind: QuickEditKind,
+  values: Record<string, string>,
+): { patch: Record<string, unknown>; addressEdits: Record<string, string> } {
+  const patch: Record<string, unknown> = {};
+  const addressEdits: Record<string, string> = {};
+
+  for (const f of QUICK_EDIT_FIELDS[kind]) {
+    if (!(f.key in values)) continue;
+    const v = values[f.key]?.trim() ?? '';
+    if (f.group === 'address' || (kind === 'venue' && ADDRESS_KEYS.has(f.key))) {
+      addressEdits[f.key] = v;
+    } else {
+      patch[f.key] = v === '' ? null : v;
+    }
+  }
+  return { patch, addressEdits };
 }
 
 /** Load the current values for the quick-edit form. */
@@ -56,40 +119,11 @@ export async function getEntityQuickEdit(entityId: string): Promise<QuickEditDat
   const kind = toKind(data.type);
   if (!kind) return null;
 
-  const values: Record<string, string> = {};
-  // Address fields resolve through readEntityAddress so whatever the contact
-  // page (or Aion, or an import) stored shows up here — otherwise the form
-  // would open blank and a save would blank the record.
-  const raw = (data.attributes ?? {}) as Record<string, unknown>;
-  const address = readEntityAddress(raw);
-  const ADDRESS_KEYS = new Set(['street', 'city', 'state', 'postal_code']);
-
-  if (kind === 'venue') {
-    const attrs = readEntityAttrs(data.attributes, 'venue');
-    for (const f of QUICK_EDIT_FIELDS.venue) {
-      values[f.key] = ADDRESS_KEYS.has(f.key)
-        ? address[f.key as keyof EntityAddress]
-        : str((attrs as Record<string, unknown>)[f.key]);
-    }
-  } else if (kind === 'company') {
-    const attrs = readEntityAttrs(data.attributes, 'company');
-    for (const f of QUICK_EDIT_FIELDS.company) {
-      values[f.key] = f.group === 'address'
-        ? address[f.key as keyof EntityAddress]
-        : str((attrs as Record<string, unknown>)[f.key]);
-    }
-  } else {
-    const attrs = readEntityAttrs(data.attributes, 'person');
-    for (const f of QUICK_EDIT_FIELDS.person) {
-      values[f.key] = str((attrs as Record<string, unknown>)[f.key]);
-    }
-  }
-
   return {
     entityId: data.id as string,
     kind,
     displayName: (data.display_name as string) ?? '',
-    values,
+    values: buildQuickEditValues(kind, data.attributes),
   };
 }
 
@@ -110,19 +144,7 @@ export async function saveEntityQuickEdit(
   if (!fields) return { ok: false, error: 'Unsupported entity type.' };
 
   const supabase = await createClient();
-  const patch: Record<string, unknown> = {};
-  const addressEdits: Record<string, string> = {};
-  const ADDRESS_KEYS = new Set(['street', 'city', 'state', 'postal_code']);
-
-  for (const f of fields) {
-    if (!(f.key in values)) continue;
-    const v = values[f.key]?.trim() ?? '';
-    if (f.group === 'address' || (kind === 'venue' && ADDRESS_KEYS.has(f.key))) {
-      addressEdits[f.key] = v;
-    } else {
-      patch[f.key] = v === '' ? null : v;
-    }
-  }
+  const { patch, addressEdits } = splitQuickEditValues(kind, values);
 
   if (Object.keys(addressEdits).length > 0) {
     // Merge onto the stored address so fields this form does not show (country)
@@ -141,9 +163,7 @@ export async function saveEntityQuickEdit(
 
   // Validate the patch shape before writing. partial() so we only assert the
   // keys we are actually sending.
-  const schema =
-    kind === 'venue' ? VenueAttrsSchema : kind === 'company' ? CompanyAttrsSchema : PersonAttrsSchema;
-  const parsed = schema.partial().safeParse(patch);
+  const parsed = SCHEMA_BY_KIND[kind].partial().safeParse(patch);
   if (!parsed.success) {
     return { ok: false, error: 'Those values are not valid for this record.' };
   }

@@ -260,7 +260,7 @@ async function resolveWorkspaceIdFromDeal(
 }
 
 /** Build a definition_snapshot JSONB object from line item data. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts line items from several call sites whose row shapes differ; only known keys are read.
 function buildSnapshot(item: any): Record<string, unknown> | null {
   const snap: Record<string, unknown> = {};
   if (item.category) snap.margin_meta = { category: item.category };
@@ -431,8 +431,7 @@ export type DraftInsertPoint =
  * onto this helper too -- the copies drifting apart is a real risk.
  */
 export async function resolveDraftInsertPoint(
-  // The supabase client type varies by caller; only .from() is used here.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the supabase client type varies by caller; only .from() is used here.
   supabase: any,
   dealId: string,
   workspaceId: string,

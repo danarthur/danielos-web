@@ -9,7 +9,18 @@ import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
 import type { NetworkNode } from '@/entities/network';
 import { mergeNodesByEntity } from './merge-nodes';
-import { PERSON_ATTR, COUPLE_ATTR } from '../../model/attribute-keys';
+import { PERSON_ATTR } from '../../model/attribute-keys';
+import {
+  fetchStarredEntityIds,
+  withStars,
+  withCrewRoles,
+  readContactEmail,
+  resolveNodeLabel,
+  indexCrewSkills,
+  indexByEntity,
+  sumBy,
+  countBy,
+} from './stream-helpers';
 import { ROLE_ORDER, getCurrentEntityAndOrg } from '../network-helpers';
 
 /**
@@ -116,44 +127,10 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
       : { data: [] as { entity_id: string; capability: string }[] },
   ]);
 
-  // Build skills map from ops.crew_skills
-  const crewSkillsByEntityId = new Map<string, string[]>();
-  // Crew roles come from the same rows: role_tag is the controlled value that
-  // grouping reads, while skill_tag keeps whatever was originally typed. That
-  // is what lets historic 'dj' and 'DJ' rows group as one role.
-  const crewRolesByEntityId = new Map<string, string[]>();
-  for (const row of crewSkillsRes.data ?? []) {
-    const list = crewSkillsByEntityId.get(row.entity_id) ?? [];
-    list.push(row.skill_tag);
-    crewSkillsByEntityId.set(row.entity_id, list);
-
-    const roleTag = (row as { role_tag?: string | null }).role_tag;
-    if (roleTag) {
-      const roles = crewRolesByEntityId.get(row.entity_id) ?? [];
-      if (!roles.includes(roleTag)) roles.push(roleTag);
-      crewRolesByEntityId.set(row.entity_id, roles);
-    }
-  }
-
-  // Build capabilities map from ops.entity_capabilities
-  const capabilitiesByEntityId = new Map<string, string[]>();
-  for (const row of (capabilitiesRes.data ?? []) as { entity_id: string; capability: string }[]) {
-    const list = capabilitiesByEntityId.get(row.entity_id) ?? [];
-    list.push(row.capability);
-    capabilitiesByEntityId.set(row.entity_id, list);
-  }
-
-  // Aggregate outstanding balance per entity in JS
-  const balanceMap = new Map<string, number>();
-  for (const inv of (invoicesRes.data ?? [])) {
-    balanceMap.set(inv.bill_to_entity_id, (balanceMap.get(inv.bill_to_entity_id) ?? 0) + (inv.total_amount ?? 0));
-  }
-
-  // Aggregate referral count per entity
-  const referralCountMap = new Map<string, number>();
-  for (const row of (referralCountRes.data ?? []) as { referrer_entity_id: string }[]) {
-    referralCountMap.set(row.referrer_entity_id, (referralCountMap.get(row.referrer_entity_id) ?? 0) + 1);
-  }
+  const { crewSkillsByEntityId, crewRolesByEntityId } = indexCrewSkills(crewSkillsRes.data);
+  const capabilitiesByEntityId = indexByEntity(capabilitiesRes.data, 'capability');
+  const balanceMap = sumBy(invoicesRes.data, 'bill_to_entity_id', 'total_amount');
+  const referralCountMap = countBy(referralCountRes.data, 'referrer_entity_id');
 
   const personMap = new Map((personEntRes.data ?? []).map((p) => [p.id, p]));
   const partnerEntMap = new Map((partnerEntRes.data ?? []).map((p) => [p.id, p]));
@@ -242,14 +219,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     const entityType = (partner?.type as 'person' | 'company' | 'venue' | 'couple') ?? undefined;
     const attrs = (partner?.attributes as Record<string, unknown>) ?? {};
     const relType = edge.relationship_type as NetworkNode['relationshipType'];
-    // Use COUPLE_ATTR / PERSON_ATTR constants so couple entities never ghost-read a
-    // preserved email key from a prior person → couple reclassification.
-    const email =
-      entityType === 'couple'
-        ? ((attrs[COUPLE_ATTR.partner_a_email] as string) ?? undefined)
-        : entityType === 'person'
-          ? ((attrs[PERSON_ATTR.email] as string) ?? undefined)
-          : undefined;
+    const email = readContactEmail(entityType, attrs);
     // Only persons on PARTNER / VENDOR edges act as "freelancers" with a
     // job-title-based roleGroup. CLIENT-edge persons are wedding hosts or
     // individual clients and should NOT be grouped with crew.
@@ -258,14 +228,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
       entityType === 'person' && !isClientPerson
         ? (attrs[PERSON_ATTR.job_title] as string | null) ?? null
         : null;
-    // Label: clients (couple or individual) label as 'Client'; freelancer
-    // persons fall back to job_title → 'Freelancer'; everyone else uses the
-    // cortex-type label ('Vendor' / 'Venue' / 'Partner').
-    const label = relType === 'CLIENT'
-      ? 'Client'
-      : entityType === 'person'
-        ? (personJobTitle || 'Freelancer')
-        : cortexTypeToLabel(edge.relationship_type);
+    const label = resolveNodeLabel(relType, entityType, personJobTitle, cortexTypeToLabel(edge.relationship_type));
     return {
       id: edge.id,
       entityId: edge.target_entity_id,
@@ -305,14 +268,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     const typeLabel = cortexTypeToLabel(rel.relationship_type);
     const entityType = (partnerEnt?.type as 'person' | 'company' | 'venue' | 'couple') ?? undefined;
     const attrs = (partnerEnt?.attributes as Record<string, unknown>) ?? {};
-    // Use COUPLE_ATTR / PERSON_ATTR constants so couple entities never ghost-read a
-    // preserved email key from a prior person → couple reclassification.
-    const email =
-      entityType === 'couple'
-        ? ((attrs[COUPLE_ATTR.partner_a_email] as string) ?? undefined)
-        : entityType === 'person'
-          ? ((attrs[PERSON_ATTR.email] as string) ?? undefined)
-          : undefined;
+    const email = readContactEmail(entityType, attrs);
 
     return {
       id: rel.id,
@@ -351,35 +307,3 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
 }
 
 /** Entity ids the signed-in user has starred in this workspace. */
-async function fetchStarredEntityIds(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cross-schema row shape is resolved at runtime; narrowing here would duplicate the generated types.
-  supabase: any,
-  workspaceId: string | null,
-): Promise<Set<string>> {
-  if (!workspaceId) return new Set();
-  const { data: auth } = await supabase.auth.getUser();
-  const userId = auth?.user?.id;
-  if (!userId) return new Set();
-
-  const { data } = await supabase
-    .schema('cortex')
-    .from('network_stars')
-    .select('entity_id')
-    .eq('workspace_id', workspaceId)
-    .eq('user_id', userId);
-
-  return new Set(((data ?? []) as { entity_id: string }[]).map((r) => r.entity_id));
-}
-
-function withStars(starred: Set<string>, nodes: NetworkNode[]): NetworkNode[] {
-  if (starred.size === 0) return nodes;
-  return nodes.map((n) => (starred.has(n.entityId) ? { ...n, starred: true } : n));
-}
-
-function withCrewRoles(roles: Map<string, string[]>, nodes: NetworkNode[]): NetworkNode[] {
-  if (roles.size === 0) return nodes;
-  return nodes.map((n) => {
-    const r = roles.get(n.entityId);
-    return r?.length ? { ...n, crewRoles: r } : n;
-  });
-}
