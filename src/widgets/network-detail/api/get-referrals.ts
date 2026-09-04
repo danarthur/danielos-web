@@ -21,6 +21,14 @@ export type ReferralDirection = 'received' | 'sent';
 export type Referral = {
   id: string;
   direction: ReferralDirection;
+  /** Who was credited, as named at the time. */
+  counterparty: { id: string; nameAtReferral: string | null };
+  /**
+   * The org they belonged to WHEN THE REFERRAL HAPPENED, frozen. Not
+   * re-resolved when they change jobs -- a past referral keeps explaining
+   * itself. Null when the counterparty is itself an org.
+   */
+  orgAtReferral: { id: string; nameAtReferral: string | null } | null;
   clientName: string | null;
   clientEntity: { id: string; name: string | null } | null;
   relatedDeal: { id: string; title: string | null } | null;
@@ -34,6 +42,18 @@ export type EntityReferrals = {
   sent: Referral[];
   receivedCount: number;
   sentCount: number;
+  /**
+   * Company entities only: referrals credited to PEOPLE who were at this org
+   * at the time. Deliberately a separate bucket from received/sent, which
+   * count only what this entity was credited with directly.
+   *
+   * DO NOT SUM these with receivedCount/sentCount. They are two views of
+   * overlapping events (the industry framing is sourced vs influenced, or
+   * NPSP's hard vs soft credit); adding them double-counts. Label the scope
+   * wherever either number is rendered.
+   */
+  throughTeam: Referral[];
+  throughTeamCount: number;
 };
 
 export type GetReferralsResult =
@@ -43,6 +63,10 @@ export type GetReferralsResult =
 type RawRow = {
   id: string;
   direction: string;
+  counterparty_entity_id: string;
+  counterparty_org_entity_id: string | null;
+  counterparty_name_at_referral: string | null;
+  counterparty_org_name_at_referral: string | null;
   client_name: string | null;
   client_entity_id: string | null;
   related_deal_id: string | null;
@@ -56,6 +80,8 @@ const EMPTY: EntityReferrals = {
   sent: [],
   receivedCount: 0,
   sentCount: 0,
+  throughTeam: [],
+  throughTeamCount: 0,
 };
 
 export async function getReferralsForEntity(
@@ -68,15 +94,16 @@ export async function getReferralsForEntity(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: 'Unauthorized.' };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await supabase
     .schema('finance')
     .from('referrals')
     .select(
-      'id, direction, client_name, client_entity_id, related_deal_id, note, created_at, created_by',
+      'id, direction, counterparty_entity_id, counterparty_org_entity_id, counterparty_name_at_referral, counterparty_org_name_at_referral, client_name, client_entity_id, related_deal_id, note, created_at, created_by',
     )
     .eq('workspace_id', workspaceId)
-    .eq('counterparty_entity_id', entityId)
+    // Direct credit OR credit through someone who was at this org at the time.
+    // Partitioned below -- the two are never merged into one count.
+    .or(`counterparty_entity_id.eq.${entityId},counterparty_org_entity_id.eq.${entityId}`)
     .order('created_at', { ascending: false })
     .limit(200);
 
@@ -85,10 +112,88 @@ export async function getReferralsForEntity(
   const rows: RawRow[] = (data ?? []) as RawRow[];
   if (rows.length === 0) return { ok: true, referrals: EMPTY };
 
-  // Join: client entity names + deal titles + user display names.
-  const clientEntityIds = Array.from(new Set(rows.map((r) => r.client_entity_id).filter((x): x is string => !!x)));
-  const dealIds = Array.from(new Set(rows.map((r) => r.related_deal_id).filter((x): x is string => !!x)));
-  const userIds = Array.from(new Set(rows.map((r) => r.created_by).filter((x): x is string => !!x)));
+  const { nameByEntityId, titleByDealId, nameByUserId } = await hydrateLookups(supabase, rows);
+
+  const received: Referral[] = [];
+  const sent: Referral[] = [];
+  const throughTeam: Referral[] = [];
+
+  for (const r of rows) {
+    const ref: Referral = {
+      id: r.id,
+      direction: r.direction as ReferralDirection,
+      counterparty: {
+        id: r.counterparty_entity_id,
+        nameAtReferral: r.counterparty_name_at_referral,
+      },
+      orgAtReferral: r.counterparty_org_entity_id
+        ? {
+            id: r.counterparty_org_entity_id,
+            nameAtReferral: r.counterparty_org_name_at_referral,
+          }
+        : null,
+      clientName: r.client_name,
+      clientEntity: r.client_entity_id
+        ? { id: r.client_entity_id, name: nameByEntityId.get(r.client_entity_id) ?? null }
+        : null,
+      relatedDeal: r.related_deal_id
+        ? { id: r.related_deal_id, title: titleByDealId.get(r.related_deal_id) ?? null }
+        : null,
+      note: r.note,
+      createdAt: r.created_at,
+      createdByName: r.created_by ? (nameByUserId.get(r.created_by) ?? null) : null,
+    };
+    // Credit through a team member is its own bucket. A row can only land in
+    // one of these, so nothing is counted twice within a single view.
+    if (r.counterparty_entity_id !== entityId) {
+      throughTeam.push(ref);
+    } else if (ref.direction === 'received') {
+      received.push(ref);
+    } else if (ref.direction === 'sent') {
+      sent.push(ref);
+    }
+  }
+
+  return {
+    ok: true,
+    referrals: {
+      received,
+      sent,
+      receivedCount: received.length,
+      sentCount: sent.length,
+      throughTeam,
+      throughTeamCount: throughTeam.length,
+    },
+  };
+}
+
+/**
+ * Resolve the display names a referral row references: client entity, related
+ * deal, and the user who logged it.
+ *
+ * Note these are LIVE lookups, and deliberately so -- they name things the
+ * referral points AT. The counterparty and their org are different: those come
+ * off the frozen `*_at_referral` columns on the row itself, because renaming or
+ * reassigning them must not rewrite what a past referral says.
+ */
+async function hydrateLookups(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the server client's generic parameters vary; only .from()/.schema() are used.
+  supabase: any,
+  rows: RawRow[],
+): Promise<{
+  nameByEntityId: Map<string, string | null>;
+  titleByDealId: Map<string, string | null>;
+  nameByUserId: Map<string, string | null>;
+}> {
+  const clientEntityIds = Array.from(
+    new Set(rows.map((r) => r.client_entity_id).filter((x): x is string => !!x)),
+  );
+  const dealIds = Array.from(
+    new Set(rows.map((r) => r.related_deal_id).filter((x): x is string => !!x)),
+  );
+  const userIds = Array.from(
+    new Set(rows.map((r) => r.created_by).filter((x): x is string => !!x)),
+  );
 
   const [clientEnts, deals, profiles] = await Promise.all([
     clientEntityIds.length > 0
@@ -111,39 +216,9 @@ export async function getReferralsForEntity(
     titleByDealId.set(d.id, d.title);
   }
   const nameByUserId = new Map<string, string | null>();
-  for (const p of (profiles.data ?? []) as { id: string; full_name: string | null }[]) {
-    nameByUserId.set(p.id, p.full_name);
+  for (const pr of (profiles.data ?? []) as { id: string; full_name: string | null }[]) {
+    nameByUserId.set(pr.id, pr.full_name);
   }
 
-  const received: Referral[] = [];
-  const sent: Referral[] = [];
-
-  for (const r of rows) {
-    const ref: Referral = {
-      id: r.id,
-      direction: r.direction as ReferralDirection,
-      clientName: r.client_name,
-      clientEntity: r.client_entity_id
-        ? { id: r.client_entity_id, name: nameByEntityId.get(r.client_entity_id) ?? null }
-        : null,
-      relatedDeal: r.related_deal_id
-        ? { id: r.related_deal_id, title: titleByDealId.get(r.related_deal_id) ?? null }
-        : null,
-      note: r.note,
-      createdAt: r.created_at,
-      createdByName: r.created_by ? (nameByUserId.get(r.created_by) ?? null) : null,
-    };
-    if (ref.direction === 'received') received.push(ref);
-    else if (ref.direction === 'sent') sent.push(ref);
-  }
-
-  return {
-    ok: true,
-    referrals: {
-      received,
-      sent,
-      receivedCount: received.length,
-      sentCount: sent.length,
-    },
-  };
+  return { nameByEntityId, titleByDealId, nameByUserId };
 }

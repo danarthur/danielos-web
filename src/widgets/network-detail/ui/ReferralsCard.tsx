@@ -74,7 +74,12 @@ export function ReferralsCard({ workspaceId, entityId }: ReferralsCardProps) {
   if (isLoading) return null;
 
   const referrals = data && 'ok' in data && data.ok ? data.referrals : null;
-  const hasAny = (referrals?.receivedCount ?? 0) + (referrals?.sentCount ?? 0) > 0;
+  // Sum only to answer "is there anything to show" -- never rendered as a total.
+  const hasAny =
+    (referrals?.receivedCount ?? 0) +
+      (referrals?.sentCount ?? 0) +
+      (referrals?.throughTeamCount ?? 0) >
+    0;
 
   // Empty state when no referrals and form not open — render a compact
   // invite rather than a full card. Matches the Day.ai "hide empty" pattern
@@ -164,6 +169,22 @@ export function ReferralsCard({ workspaceId, entityId }: ReferralsCardProps) {
           title="Sent"
           Icon={ArrowUpRight}
           items={referrals.sent}
+          onDelete={(id) => deleteMutation.mutate(id)}
+        />
+      )}
+
+      {/*
+        Referrals credited to people who were at this org at the time.
+        Rendered as its own section with its own count, and deliberately NOT
+        added to the in/out numbers above: these are two views of overlapping
+        events, so a combined total would double-count. The scope is stated in
+        the title for the same reason.
+      */}
+      {referrals && referrals.throughTeamCount > 0 && (
+        <ReferralSection
+          title="Through the team"
+          Icon={Handshake}
+          items={referrals.throughTeam}
           onDelete={(id) => deleteMutation.mutate(id)}
         />
       )}
@@ -346,6 +367,19 @@ function ReferralRow({
             <span>· {referral.createdByName}</span>
           )}
         </div>
+        {referral.orgAtReferral?.nameAtReferral && (
+          // "at the time" is load-bearing, not decoration: the person may have
+          // moved since, and this states which era the credit belongs to
+          // rather than implying they still work there.
+          <p className="text-[11px] text-[var(--stage-text-tertiary)] truncate">
+            {referral.counterparty.nameAtReferral ?? 'Unknown'}
+            {' · '}
+            <span className="text-[var(--stage-text-secondary)]">
+              {referral.orgAtReferral.nameAtReferral}
+            </span>
+            {' at the time'}
+          </p>
+        )}
         {referral.note && (
           <p className="text-[11px] text-[var(--stage-text-secondary)] italic">
             {referral.note}

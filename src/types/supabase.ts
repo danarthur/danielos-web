@@ -2257,6 +2257,9 @@ export type Database = {
           client_entity_id: string | null
           client_name: string | null
           counterparty_entity_id: string
+          counterparty_name_at_referral: string | null
+          counterparty_org_entity_id: string | null
+          counterparty_org_name_at_referral: string | null
           created_at: string
           created_by: string | null
           direction: string
@@ -2269,6 +2272,9 @@ export type Database = {
           client_entity_id?: string | null
           client_name?: string | null
           counterparty_entity_id: string
+          counterparty_name_at_referral?: string | null
+          counterparty_org_entity_id?: string | null
+          counterparty_org_name_at_referral?: string | null
           created_at?: string
           created_by?: string | null
           direction: string
@@ -2281,6 +2287,9 @@ export type Database = {
           client_entity_id?: string | null
           client_name?: string | null
           counterparty_entity_id?: string
+          counterparty_name_at_referral?: string | null
+          counterparty_org_entity_id?: string | null
+          counterparty_org_name_at_referral?: string | null
           created_at?: string
           created_by?: string | null
           direction?: string
@@ -2461,6 +2470,10 @@ export type Database = {
         Args: { p_tz: string; p_workspace_id: string }
         Returns: string
       }
+      current_employer_entity_id: {
+        Args: { p_person_entity_id: string }
+        Returns: string
+      }
       delete_referral: { Args: { p_referral_id: string }; Returns: boolean }
       get_fresh_qbo_token: {
         Args: { p_workspace_id: string }
@@ -2509,6 +2522,7 @@ export type Database = {
           p_client_entity_id?: string
           p_client_name?: string
           p_counterparty_entity_id: string
+          p_counterparty_org_entity_id?: string
           p_direction: string
           p_note?: string
           p_related_deal_id?: string

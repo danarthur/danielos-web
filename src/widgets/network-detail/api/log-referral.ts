@@ -3,6 +3,16 @@
  *
  * Workspace-scoped. Any member can log or delete. No audit retention —
  * referrals are a lightweight working ledger, not a compliance surface.
+ *
+ * ATTRIBUTION: a referral credits the PERSON and freezes the org they were at.
+ * That split follows from this being a recognition ledger rather than a
+ * payables one — an organization cannot exercise the judgement a referral
+ * represents, so the human is named, while the org is recorded for roll-up.
+ *
+ * If a commission or payout is ever attached to a referral, the PAYEE must be
+ * the ORG, not the person: every domain where money actually moves resolves to
+ * the entity. And never sum person-credit with org-credit — see the
+ * throughTeam note in get-referrals.ts.
  */
 
 'use server';
@@ -16,6 +26,16 @@ export type LogReferralInput = {
   workspaceId: string;
   direction: ReferralDirection;
   counterpartyEntityId: string;
+  /**
+   * The org to credit alongside the person. Optional: when omitted, the RPC
+   * resolves the counterparty's CURRENT employer from the live affiliation
+   * edge and freezes it onto the row. Pass it explicitly only when logging a
+   * referral that happened in the past and the person has since moved --
+   * otherwise the referral would be stamped with the wrong employer.
+   *
+   * Ignored when the counterparty is itself a company.
+   */
+  counterpartyOrgEntityId?: string | null;
   clientName?: string | null;
   clientEntityId?: string | null;
   relatedDealId?: string | null;
@@ -46,6 +66,7 @@ export async function logReferral(
       p_client_entity_id: input.clientEntityId ?? null,
       p_related_deal_id: input.relatedDealId ?? null,
       p_note: input.note ?? null,
+      p_counterparty_org_entity_id: input.counterpartyOrgEntityId ?? undefined,
     });
 
   if (error) return { ok: false, error: (error as { message: string }).message };
