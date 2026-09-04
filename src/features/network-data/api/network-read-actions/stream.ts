@@ -20,6 +20,7 @@ import {
   indexByEntity,
   sumBy,
   countBy,
+  attachAffiliations,
 } from './stream-helpers';
 import { ROLE_ORDER, getCurrentEntityAndOrg } from '../network-helpers';
 
@@ -298,12 +299,16 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     (orgDirEnt as { owner_workspace_id?: string | null }).owner_workspace_id ?? null,
   );
 
-  return withCrewRoles(crewRolesByEntityId, withStars(starredIds, mergeNodesByEntity([
+  const merged = withCrewRoles(crewRolesByEntityId, withStars(starredIds, mergeNodesByEntity([
     ...coreNodes,
     ...extendedTeamNodes,
     ...innerCircleNodes,
     ...outerOrbitNodes,
   ])));
+
+  // Last, so it sees the final merged node set and can attach an employer to a
+  // person node and the matching people to the company node in one pass.
+  return attachAffiliations(supabase, merged);
 }
 
 /** Entity ids the signed-in user has starred in this workspace. */
