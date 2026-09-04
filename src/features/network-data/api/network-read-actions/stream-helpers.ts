@@ -138,3 +138,159 @@ export function countBy(
   }
   return out;
 }
+
+/**
+ * Attach current affiliations: who works at each company node, and where each
+ * person node currently works.
+ *
+ * This is the fix for planners under a parent company. Two shapes were broken:
+ *
+ *   - A company's staff had no edge from the workspace at all, so they existed
+ *     in the graph and rendered NOWHERE -- reachable only by opening the
+ *     company's detail sheet.
+ *   - A person WITH their own edge (a planner who is also your client) showed
+ *     as an unrelated stranger, with no visible tie to the company sitting a
+ *     few cards away.
+ *
+ * Both are the same missing idea: the company is the relationship, the people
+ * are contacts inside it.
+ *
+ * Only live edges count (`ended_at IS NULL`) -- a departed employee must not
+ * keep appearing on their old employer's card, which is precisely what the
+ * dated edges from 20260903193000 made expressible.
+ */
+export async function attachAffiliations(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the server client's generics vary; only .schema()/.from() are used.
+  supabase: any,
+  nodes: NetworkNode[],
+): Promise<NetworkNode[]> {
+  const companyIds = nodes
+    .filter((n) => n.identity.entityType === 'company' || n.identity.entityType === 'venue')
+    .map((n) => n.entityId);
+  if (companyIds.length === 0) return nodes;
+
+  const { data: edges } = await supabase
+    .schema('cortex')
+    .from('relationships')
+    .select('source_entity_id, target_entity_id, relationship_type, context_data')
+    .in('target_entity_id', companyIds)
+    .in('relationship_type', [
+      'MEMBER', 'EMPLOYEE', 'WORKS_FOR', 'EMPLOYED_AT', 'PARTNER', 'ROSTER_MEMBER',
+    ])
+    .is('ended_at', null);
+
+  const edgeRows = (edges ?? []) as {
+    source_entity_id: string;
+    target_entity_id: string;
+    context_data: Record<string, unknown> | null;
+  }[];
+  if (edgeRows.length === 0) return nodes;
+
+  const personIds = Array.from(new Set(edgeRows.map((e) => e.source_entity_id)));
+  const { data: people } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('id, display_name, type, attributes')
+    .in('id', personIds)
+    .eq('type', 'person');
+
+  const personById = new Map(
+    ((people ?? []) as { id: string; display_name: string | null; attributes: Record<string, unknown> | null }[])
+      .map((p) => [p.id, p]),
+  );
+
+  const { affiliatesByCompany, employerByPerson } = groupAffiliations(
+    edgeRows,
+    personById,
+    new Map(nodes.map((n) => [n.entityId, n.identity.name])),
+  );
+
+  return nodes.map((n) => {
+    const affiliates = affiliatesByCompany.get(n.entityId);
+    const employer = employerByPerson.get(n.entityId);
+    if (!affiliates && !employer) return n;
+    return {
+      ...n,
+      ...(affiliates
+        ? {
+            affiliates: [...affiliates.values()].sort((a, b) =>
+              a.name.localeCompare(b.name),
+            ),
+          }
+        : {}),
+      ...(employer ? { employer } : {}),
+    };
+  });
+}
+
+export type Affiliate = NonNullable<NetworkNode['affiliates']>[number];
+
+/**
+ * Pure grouping half of attachAffiliations, split out so the de-duplication
+ * rule is testable without a database.
+ *
+ * The rule that matters: results are keyed by PERSON, not accumulated per
+ * edge. The same human routinely holds two affiliation edges to one company --
+ * MEMBER *and* ROSTER_MEMBER is the norm in current data -- and pushing per
+ * edge listed everyone twice on the company card.
+ */
+export function groupAffiliations(
+  edgeRows: {
+    source_entity_id: string;
+    target_entity_id: string;
+    context_data: Record<string, unknown> | null;
+  }[],
+  personById: Map<string, { id: string; display_name: string | null; attributes: Record<string, unknown> | null }>,
+  companyNameById: Map<string, string>,
+): {
+  affiliatesByCompany: Map<string, Map<string, Affiliate>>;
+  employerByPerson: Map<string, { entityId: string; name: string }>;
+} {
+  const affiliatesByCompany = new Map<string, Map<string, Affiliate>>();
+  const employerByPerson = new Map<string, { entityId: string; name: string }>();
+
+  for (const e of edgeRows) {
+    const person = personById.get(e.source_entity_id);
+    if (!person) continue;
+
+    const jobTitle = readJobTitle(e.context_data, person.attributes);
+
+    const list = affiliatesByCompany.get(e.target_entity_id) ?? new Map<string, Affiliate>();
+    const existing = list.get(person.id);
+    if (existing) {
+      // A later edge only fills in a job title the earlier one lacked.
+      if (!existing.jobTitle && jobTitle) existing.jobTitle = jobTitle;
+    } else {
+      list.set(person.id, {
+        entityId: person.id,
+        name: person.display_name ?? 'Unnamed',
+        jobTitle,
+      });
+    }
+    affiliatesByCompany.set(e.target_entity_id, list);
+
+    // First edge wins; the ordering question only matters for the rare person
+    // affiliated to two companies at once, and a card shows one employer line.
+    if (!employerByPerson.has(person.id)) {
+      const name = companyNameById.get(e.target_entity_id);
+      if (name) employerByPerson.set(person.id, { entityId: e.target_entity_id, name });
+    }
+  }
+
+  return { affiliatesByCompany, employerByPerson };
+}
+
+/**
+ * Job title for an affiliation: the edge's own context wins over the person's
+ * profile, because the same human can hold different titles at different
+ * companies and the edge is the one that knows which.
+ */
+function readJobTitle(
+  contextData: Record<string, unknown> | null,
+  attributes: Record<string, unknown> | null,
+): string | null {
+  const fromEdge = (contextData ?? {}).job_title as string | null | undefined;
+  if (fromEdge) return fromEdge;
+  const fromProfile = (attributes ?? {})[PERSON_ATTR.job_title] as string | null | undefined;
+  return fromProfile ?? null;
+}

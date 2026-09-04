@@ -13,6 +13,7 @@ import { PERSON_ATTR, COMPANY_ATTR, VENUE_ATTR, COUPLE_ATTR, INDIVIDUAL_ATTR } f
 import { getCurrentEntityAndOrg } from '../network-helpers';
 import { readEntityAddress } from '@/shared/lib/entity-address';
 import type { NodeDetail } from './types';
+import { callerIsWorkspaceAdmin } from '@/entities/organization/api/caller-workspace-role';
 
 /**
  * Compute a qualitative relationship strength label from show count, recency, and lifetime value.
@@ -87,19 +88,14 @@ export async function getNetworkNodeDetails(
       const name = [firstName, lastName].filter(Boolean).join(' ') || personEnt?.display_name || email || 'Unknown';
       const role = (ctx.role as 'owner' | 'admin' | 'member' | 'restricted' | null) ?? null;
 
-      // Check caller's permission via cortex
-      const { entityId } = await getCurrentEntityAndOrg(supabase);
-      let canAssignElevatedRole = false;
-      if (entityId) {
-        const { data: callerRel } = await supabase
-          .schema('cortex').from('relationships')
-          .select('context_data').eq('source_entity_id', entityId)
-          .eq('target_entity_id', cortexRel.target_entity_id)
-          .eq('relationship_type', 'ROSTER_MEMBER').is('ended_at', null).maybeSingle();
-        const callerCtx = (callerRel?.context_data as Record<string, unknown>) ?? {};
-        const callerRole = (callerCtx.role as string | null) ?? null;
-        canAssignElevatedRole = callerRole === 'owner' || callerRole === 'admin';
-      }
+      // Permissions come from workspace_members, not from a relationship edge.
+      // Reading the caller's ROSTER_MEMBER context_data.role here returned null
+      // for a workspace OWNER (whose entity carries a MEMBER edge instead), so
+      // the owner could not assign elevated roles. Third instance of the same
+      // root cause -- see roster-actions.ts and team-invite/api/actions.ts.
+      const canAssignElevatedRole = await callerIsWorkspaceAdmin(supabase, {
+        entityId: cortexRel.target_entity_id,
+      });
 
       const employmentStatus = (ctx.employment_status as string | null) ?? null;
       const resolvedKind: NodeDetail['kind'] =

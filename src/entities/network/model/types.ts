@@ -55,6 +55,23 @@ export type NetworkNode = {
    * drives. Distinct from permission roles (ops.workspace_roles).
    */
   crewRoles?: string[];
+  /**
+   * People currently affiliated with this COMPANY node (MEMBER / EMPLOYEE /
+   * WORKS_FOR / EMPLOYED_AT / PARTNER / ROSTER_MEMBER edges that have not
+   * ended).
+   *
+   * Populated for company and venue nodes. This is how a planner working under
+   * a parent company becomes reachable at all: people like these often have no
+   * direct edge from the workspace, so before this they existed in the graph
+   * but appeared nowhere on the contacts page.
+   */
+  affiliates?: { entityId: string; name: string; jobTitle: string | null }[];
+  /**
+   * The company this PERSON currently works for, if any. Live, not frozen --
+   * this answers "where are they now", which is the opposite of the frozen
+   * stamps on deals and referrals, which answer "where were they then".
+   */
+  employer?: { entityId: string; name: string } | null;
   meta: {
     email?: string;
     phone?: string;

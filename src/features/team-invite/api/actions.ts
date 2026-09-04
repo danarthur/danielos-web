@@ -13,6 +13,7 @@ import type { RosterBadgeData, RosterBadgeStatus, RosterMemberDisplay } from '..
 import type { OrgMemberRole } from '@/entities/organization/model/types';
 import { sendEmployeeInviteEmail } from '@/shared/api/email/send';
 import { instrument } from '@/shared/lib/instrumentation';
+import { getCallerWorkspaceRole } from '@/entities/organization/api/caller-workspace-role';
 
 export type AcceptEmployeeInviteResult = { ok: true } | { ok: false; error: string };
 export type InviteEmployeeResult = { ok: true; message: string } | { ok: false; error: string };
@@ -43,43 +44,24 @@ function normalizeRosterError(err: { message?: string; code?: string } | null | 
   return 'Something went wrong. Please try again.';
 }
 
-/** Current user's role in the org (for canAssignAdmin: only owner/admin can assign admin). */
+/**
+ * Current user's role in the workspace that owns this org.
+ *
+ * Reads `public.workspace_members`, which is the authority for permissions.
+ * This previously read `context_data.role` off the caller's ROSTER_MEMBER edge,
+ * which returned null for anyone without one -- including the workspace OWNER,
+ * whose entity carries a MEMBER edge instead. The visible effect was an owner
+ * being told they could not assign admins on their own team page. Same root
+ * cause as the roster gate in network-data/api/roster-actions.ts: an edge is a
+ * fact about the graph, not an authorization.
+ */
 export async function getCurrentUserOrgRole(orgId: string): Promise<OrgMemberRole | null> {
   return instrument('getCurrentUserOrgRole', async () => {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+    const supabase = await createClient();
 
-  // Find person entity by auth user
-  const { data: personEnt } = await supabase
-    .schema('directory')
-    .from('entities')
-    .select('id')
-    .eq('claimed_by_user_id', user.id)
-    .maybeSingle();
-  if (!personEnt) return null;
-
-  // Find org entity by legacy org id
-  const { data: orgEnt } = await supabase
-    .schema('directory')
-    .from('entities')
-    .select('id')
-    .eq('legacy_org_id', orgId)
-    .maybeSingle();
-  if (!orgEnt) return null;
-
-  // Find ROSTER_MEMBER edge
-  const { data: rel } = await supabase
-    .schema('cortex')
-    .from('relationships')
-    .select('context_data')
-    .eq('source_entity_id', personEnt.id)
-    .eq('target_entity_id', orgEnt.id)
-    .eq('relationship_type', 'ROSTER_MEMBER')
-    .is('ended_at', null)
-    .maybeSingle();
-
-  return ((rel?.context_data as Record<string, unknown>)?.role as OrgMemberRole) ?? null;
+    return (await getCallerWorkspaceRole(supabase, {
+      legacyOrgId: orgId,
+    })) as OrgMemberRole | null;
   });
 }
 

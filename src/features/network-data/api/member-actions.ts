@@ -9,6 +9,7 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
 import { getCurrentEntityAndOrg } from './network-helpers';
+import { getCallerWorkspaceRole } from '@/entities/organization/api/caller-workspace-role';
 
 /**
  * Update a ghost org member (role, job_title, avatar_url, phone). Creator org only.
@@ -180,27 +181,10 @@ export async function updateOrgMemberRole(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: 'Not signed in.' };
 
-  // Get caller's directory entity + their org role
-  const { data: callerEnt } = await supabase
-    .schema('directory').from('entities')
-    .select('id').eq('claimed_by_user_id', user.id).maybeSingle();
-  if (!callerEnt) return { ok: false, error: 'Account not linked.' };
-
-  const { data: orgDirEnt } = await supabase
-    .schema('directory').from('entities')
-    .select('id').eq('legacy_org_id', sourceOrgId).maybeSingle();
-  if (!orgDirEnt) return { ok: false, error: 'Organization not found.' };
-
-  const { data: callerRel } = await supabase
-    .schema('cortex').from('relationships')
-    .select('context_data')
-    .eq('source_entity_id', callerEnt.id)
-    .eq('target_entity_id', orgDirEnt.id)
-    .eq('relationship_type', 'ROSTER_MEMBER')
-    .is('ended_at', null)
-    .maybeSingle();
-  const callerCtx = (callerRel?.context_data as Record<string, unknown>) ?? {};
-  const currentRole = (callerCtx.role as OrgMemberRoleDb | null) ?? null;
+  // Permissions come from workspace_members, never from a relationship edge.
+  const currentRole = (await getCallerWorkspaceRole(supabase, {
+    legacyOrgId: sourceOrgId,
+  })) as OrgMemberRoleDb | null;
 
   if (!currentRole || !['owner', 'admin'].includes(currentRole)) {
     return { ok: false, error: 'Only owners and admins can change roles.' };

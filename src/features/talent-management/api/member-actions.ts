@@ -7,6 +7,7 @@ import type { OrgMemberWithSkillsDTO } from '@/entities/talent';
 import { updateMemberIdentitySchema, addSkillSchema, removeSkillSchema } from '../model/schema';
 import type { UpdateMemberIdentityInput, AddSkillInput, RemoveSkillInput } from '../model/schema';
 import { addCrewSkill, removeCrewSkill } from './crew-skill-actions';
+import { getCallerWorkspaceRole } from '@/entities/organization/api/caller-workspace-role';
 
 export async function getMemberForSheet(orgMemberId: string): Promise<OrgMemberWithSkillsDTO | null> {
   return getOrgMemberWithSkills(orgMemberId);
@@ -97,20 +98,11 @@ export async function updateMemberIdentity(input: UpdateMemberIdentityInput): Pr
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { ok: false, error: 'Not signed in.' };
 
-    const { data: callerEnt } = await supabase
-      .schema('directory').from('entities')
-      .select('id').eq('claimed_by_user_id', user.id).maybeSingle();
-    if (callerEnt) {
-      const { data: callerRel } = await supabase
-        .schema('cortex').from('relationships')
-        .select('context_data')
-        .eq('source_entity_id', callerEnt.id)
-        .eq('target_entity_id', rel.target_entity_id)
-        .eq('relationship_type', 'ROSTER_MEMBER')
-        .is('ended_at', null)
-        .maybeSingle();
-      const callerCtx = (callerRel?.context_data as Record<string, unknown>) ?? {};
-      const currentRole = (callerCtx.role as OrgMemberRoleDb | null) ?? null;
+    {
+      // Permissions come from workspace_members, never from a relationship edge.
+      const currentRole = (await getCallerWorkspaceRole(supabase, {
+        entityId: rel.target_entity_id,
+      })) as OrgMemberRoleDb | null;
       const newRole = parsed.data.role === 'manager' ? 'member' : parsed.data.role;
       if (newRole === 'owner' && currentRole !== 'owner') {
         return { ok: false, error: 'Only the owner can assign the owner role.' };

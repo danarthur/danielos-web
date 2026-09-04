@@ -211,6 +211,27 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
                 ${(node.meta.outstanding_balance!).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} outstanding
               </p>
             )}
+            {/*
+              Employer line on a person. Without it, a planner and the agency
+              they work for sit as two unrelated cards with nothing connecting
+              them -- which is how the same relationship read as two strangers.
+            */}
+            {node.employer && (
+              <p className="mt-1 truncate stage-label text-[var(--stage-text-secondary)]">
+                {node.employer.name}
+              </p>
+            )}
+            {/*
+              People at this company. Many have no direct edge to the workspace,
+              so this row is the only place they surface on the contacts page at
+              all. Two names then a count -- the card is a glance, not a roster.
+            */}
+            {node.affiliates && node.affiliates.length > 0 && (
+              <p className="mt-1 truncate stage-label text-[var(--stage-text-secondary)]">
+                {node.affiliates.slice(0, 2).map((a) => a.name).join(', ')}
+                {node.affiliates.length > 2 && ` +${node.affiliates.length - 2}`}
+              </p>
+            )}
             {(node.meta.referral_count ?? 0) > 0 && (
               <p className="mt-1 font-[family-name:var(--stage-data-font)] text-[length:var(--stage-readout-sm-size)] tabular-nums text-[var(--stage-text-secondary)]">
                 {node.meta.referral_count} referral{node.meta.referral_count! > 1 ? 's' : ''}
