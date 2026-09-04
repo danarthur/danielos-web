@@ -8,6 +8,9 @@ import { Network } from 'lucide-react';
 import { createClient } from '@/shared/api/supabase/server';
 import { getWorkspaceIndustryTags } from '@/entities/talent/api/get-workspace-industry-tags';
 import { IndustryTagManager } from '@/features/network-data/ui/IndustryTagManager';
+import { LabelPackPicker } from '@/features/network-data/ui/LabelPackPicker';
+import { CrewRoleManager } from '@/features/network-data/ui/CrewRoleManager';
+import { getWorkspaceLabelPack, listCrewRoles } from '@/features/network-data';
 
 export const metadata = {
   title: 'Network Tags | Settings | Unusonic',
@@ -37,6 +40,8 @@ export default async function NetworkTagsSettingsPage() {
   if (!membership?.workspace_id || !workspace) redirect('/settings');
 
   const tags = await getWorkspaceIndustryTags(workspace.id);
+  const labelPack = await getWorkspaceLabelPack(workspace.id);
+  const crewRoles = await listCrewRoles(workspace.id);
 
   return (
     <div className="flex-1 min-h-0 overflow-auto">
@@ -46,11 +51,37 @@ export default async function NetworkTagsSettingsPage() {
             <Network className="w-5 h-5 text-[var(--stage-text-secondary)]" aria-hidden />
           </div>
           <div className="min-w-0">
-            <h1 className="text-2xl font-medium tracking-tight text-[var(--stage-text-primary)]">Network tags</h1>
+            <h1 className="text-2xl font-medium tracking-tight text-[var(--stage-text-primary)]">Network</h1>
             <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed mt-0.5">
-              Industry categories for vendors, partners, and venues
+              Vocabulary and industry tags for your network
             </p>
           </div>
+        </div>
+
+        <div className="stage-panel rounded-2xl p-6 space-y-4">
+          <div>
+            <h2 className="text-base font-medium tracking-tight text-[var(--stage-text-primary)]">Vocabulary</h2>
+            <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">
+              What your team calls the people and companies in your network. Pick the words
+              that match how you actually talk about the work.
+            </p>
+          </div>
+          <LabelPackPicker workspaceId={workspace.id} initialPack={labelPack} />
+        </div>
+
+        <div className="stage-panel rounded-2xl p-6 space-y-4">
+          <div>
+            <h2 className="text-base font-medium tracking-tight text-[var(--stage-text-primary)]">Crew roles</h2>
+            <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">
+              What the people on your roster do — used to filter a long list by role.
+              Separate from Settings → Roles, which controls what someone can access.
+            </p>
+          </div>
+          <CrewRoleManager
+            workspaceId={workspace.id}
+            initialRoles={crewRoles}
+            labelPack={labelPack}
+          />
         </div>
 
         <div className="stage-panel rounded-2xl p-6 space-y-4">

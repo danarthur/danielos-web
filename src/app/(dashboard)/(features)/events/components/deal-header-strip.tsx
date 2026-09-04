@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, Eye, Plus, User } from 'lucide-react';
+import { ArrowUpRight, Building2, Eye, Plus, User } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
@@ -64,6 +64,9 @@ import {
   type DealHeaderStripProps,
 } from './deal-header-strip-shared';
 import { StakeholderChip } from './deal-header-strip-stakeholder-chip';
+import { DealHeaderQuickEditSheet } from './deal-header-quick-edit-sheet';
+import { getEntityQuickEdit } from '../actions/quick-edit-entity';
+import type { QuickEditData } from '../actions/quick-edit-fields';
 import { DealHeaderIdentityRow } from './deal-header-strip-identity-row';
 import { DealHeaderEditSheets } from './deal-header-strip-edit-sheets';
 
@@ -512,6 +515,33 @@ export function DealHeaderStrip({
     else toast.error('Could not load client details.');
   };
 
+  // ── Quick edit ───────────────────────────────────────────────────────────
+  // Basic details (a venue's address, a planner's website, a contact's phone)
+  // are editable in place; the sheet links through for anything deeper.
+  const [quickEdit, setQuickEdit] = useState<{ open: boolean; data: QuickEditData | null }>({
+    open: false,
+    data: null,
+  });
+
+  const handleQuickEdit = async (entityId: string | null | undefined) => {
+    if (!entityId) return;
+    setQuickEdit({ open: true, data: null });
+    const data = await getEntityQuickEdit(entityId);
+    if (data) {
+      setQuickEdit({ open: true, data });
+      return;
+    }
+    // Couples have their own dedicated editor (two partners, shared contact
+    // details), so they fall through to it rather than the generic sheet.
+    setQuickEdit({ open: false, data: null });
+    const couple = await getCoupleEntityForEdit(entityId);
+    if (couple) {
+      setCoupleEdit({ open: true, entityId, initialValues: couple });
+      return;
+    }
+    toast.error('Those details cannot be edited here yet.');
+  };
+
   // Dismiss pickers on outside click
   useEffect(() => {
     if (!activeSlot && !ownerPickerOpen && !datePickerOpen && !archetypePickerOpen) return;
@@ -611,6 +641,7 @@ export function DealHeaderStrip({
                   <p className={FIELD_LABEL_CLASS}>{hosts.length > 1 ? 'Hosts' : 'Client'}</p>
                   {hosts.length > 0 ? (
                     <PeopleStrip
+                      onEditEntity={!readOnly ? (id) => handleQuickEdit(id) : undefined}
                       hosts={hosts}
                       secondary={peopleStripSecondary}
                       readOnly={readOnly}
@@ -633,7 +664,15 @@ export function DealHeaderStrip({
                       currentDealPocEntityId={currentDealPocEntityId}
                     />
                   ) : billTo ? (
-                    <StakeholderChip stakeholder={billTo} readOnly={readOnly} />
+                    <StakeholderChip
+                      stakeholder={billTo}
+                      readOnly={readOnly}
+                      onEdit={
+                        !readOnly
+                          ? () => handleQuickEdit(billTo.entity_id ?? billTo.organization_id)
+                          : undefined
+                      }
+                    />
                   ) : hasLegacyClient ? (
                     <div className="flex items-center gap-1.5 min-w-0">
                       <Building2 className="size-3.5 text-[var(--stage-text-tertiary)] shrink-0" />
@@ -686,6 +725,11 @@ export function DealHeaderStrip({
                     <StakeholderChip
                       stakeholder={venueSt}
                       readOnly={readOnly}
+                      onEdit={
+                        !readOnly
+                          ? () => handleQuickEdit(venueSt.entity_id ?? venueSt.organization_id)
+                          : undefined
+                      }
                       onSwap={!readOnly ? () => handleOpenSlot('venue', venueTriggerRef) : undefined}
                     />
                   ) : (
@@ -724,9 +768,30 @@ export function DealHeaderStrip({
                 >
                   <p className={FIELD_LABEL_CLASS}>Owner</p>
                   {ownerLabel ? (
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <User className="size-3.5 text-[var(--stage-text-tertiary)] shrink-0" />
-                      <span className="stage-readout truncate">{ownerLabel}</span>
+                    <div className="group flex items-center gap-1 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <User className="size-3.5 text-[var(--stage-text-tertiary)] shrink-0" />
+                        <span className="stage-readout truncate">{ownerLabel}</span>
+                      </div>
+                      {!readOnly && ownerEntityId && (
+                        // The owner is a workspace member, so their contact
+                        // details are a team record rather than deal data --
+                        // link to the profile instead of editing in place.
+                        <Link
+                          href={`/network/entity/${encodeURIComponent(ownerEntityId)}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className={cn(
+                            'shrink-0 inline-flex items-center justify-center size-5 rounded-sm',
+                            'opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity',
+                            'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)]',
+                            'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
+                          )}
+                          aria-label="Open profile"
+                          title="Open profile"
+                        >
+                          <ArrowUpRight size={11} strokeWidth={1.5} />
+                        </Link>
+                      )}
                     </div>
                   ) : ownerEntityId ? (
                     // Owner assigned but name still resolving — show just the
@@ -804,6 +869,11 @@ export function DealHeaderStrip({
                                   }),
                               },
                             }
+                          : undefined
+                      }
+                      onEdit={
+                        !readOnly
+                          ? () => handleQuickEdit(plannerSt.entity_id ?? plannerSt.organization_id)
                           : undefined
                       }
                       onSwap={!readOnly ? () => handleOpenSlot('planner', plannerTriggerRef) : undefined}
@@ -900,6 +970,12 @@ export function DealHeaderStrip({
         individualEdit={individualEdit}
         onIndividualEditClose={() => setIndividualEdit(null)}
         onStakeholdersChange={onStakeholdersChange}
+      />
+      <DealHeaderQuickEditSheet
+        open={quickEdit.open}
+        onOpenChange={(open) => setQuickEdit((q) => ({ ...q, open }))}
+        data={quickEdit.data}
+        onSaved={onStakeholdersChange}
       />
     </>
   );

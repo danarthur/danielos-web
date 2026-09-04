@@ -28,6 +28,8 @@ import {
 import type { AionToolContext } from './tools/types';
 import { isMobileSurface } from '../lib/surface-detection';
 import { buildSystemPrompt, buildGreeting } from './route/prompts';
+import { getWorkspaceLabelPack, listCrewRoles } from '@/features/network-data';
+import { buildVocabularyBlock } from '@/entities/network/model/vocabulary-prompt';
 import { buildToolsForIntent } from './route/tools';
 import {
   resolveTokenUsage,
@@ -171,7 +173,19 @@ export async function POST(req: Request) {
     }
   }
 
-  const systemPrompt = scopePrefix + buildSystemPrompt(aionConfig, onboardingState, workspaceName, wsSnapshot, userName, userRole ?? 'viewer', userMemories, pageContext);
+  // Workspace vocabulary: Aion speaks the workspace's words while every tool
+  // argument stays canonical. Without this, renaming Roster to Talent gives an
+  // assistant whose UI and sentences disagree.
+  const [labelPack, crewRoles] = await Promise.all([
+    getWorkspaceLabelPack(workspaceId),
+    listCrewRoles(workspaceId),
+  ]);
+  const vocabularyBlock = buildVocabularyBlock({
+    pack: labelPack,
+    crewRoleLabels: crewRoles.map((r) => r.label),
+  });
+
+  const systemPrompt = scopePrefix + buildSystemPrompt(aionConfig, onboardingState, workspaceName, wsSnapshot, userName, userRole ?? 'viewer', userMemories, pageContext, vocabularyBlock);
 
   // 8. Build the message history (with rolling summarization for long conversations)
   const allMessages = messages.map((m) => ({

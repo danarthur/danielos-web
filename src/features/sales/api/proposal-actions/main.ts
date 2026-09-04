@@ -407,6 +407,108 @@ export async function getExpandedPackageLineItems(
 //   runs the supersede transaction and creates a fresh draft cloning the
 //   prior line items.
 // =============================================================================
+// resolveDraftInsertPoint — shared draft guard + sort-order placement
+// =============================================================================
+
+export type DraftInsertPoint =
+  | { ok: true; proposalId: string; nextSortOrder: number }
+  | { ok: false; error: string };
+
+/**
+ * Resolve which draft proposal a new row belongs to, and where in the order it
+ * goes.
+ *
+ * Duplicate-draft guard — three cases:
+ *   1. Live draft exists         -> reuse it.
+ *   2. Live sent/viewed/accepted -> fail loudly; caller must revise.
+ *   3. Nothing live              -> create a fresh draft.
+ *
+ * When `insertAfterSortOrder` is given, rows below the insertion point are
+ * shifted down by `rowsCount` so the new rows land in the gap. Otherwise the
+ * next sort_order after the current maximum is returned.
+ *
+ * NOTE: upsertProposal still carries its own copy of this guard. It should move
+ * onto this helper too -- the copies drifting apart is a real risk.
+ */
+export async function resolveDraftInsertPoint(
+  // The supabase client type varies by caller; only .from() is used here.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  dealId: string,
+  workspaceId: string,
+  insertAfterSortOrder: number | null | undefined,
+  rowsCount: number,
+): Promise<DraftInsertPoint> {
+  const { data: livePropRows } = await supabase
+    .from('proposals')
+    .select('id, status, superseded_at')
+    .eq('deal_id', dealId)
+    .is('superseded_at', null)
+    .order('created_at', { ascending: false });
+
+  const liveRows = (livePropRows ?? []) as { id: string; status: string; superseded_at: string | null }[];
+  const liveDraft = liveRows.find((r) => r.status === 'draft') ?? null;
+  const liveActive = liveRows.find((r) => r.status !== 'draft') ?? null;
+
+  if (!liveDraft && liveActive) {
+    return {
+      ok: false,
+      error: `Deal already has a ${liveActive.status} proposal. Use sendProposalRevision to start a new draft.`,
+    };
+  }
+
+  if (liveDraft) {
+    const proposalId = liveDraft.id;
+    if (insertAfterSortOrder != null) {
+      const { data: toShift } = await supabase
+        .from('proposal_items')
+        .select('id, sort_order')
+        .eq('proposal_id', proposalId)
+        .gt('sort_order', insertAfterSortOrder)
+        .order('sort_order', { ascending: false });
+      if (toShift && toShift.length > 0) {
+        // Reverse order so temporary collisions can't violate a future
+        // UNIQUE(proposal_id, sort_order) constraint.
+        for (const row of toShift as { id: string; sort_order: number }[]) {
+          await supabase
+            .from('proposal_items')
+            .update({ sort_order: row.sort_order + rowsCount })
+            .eq('id', row.id);
+        }
+      }
+      return { ok: true, proposalId, nextSortOrder: insertAfterSortOrder + 1 };
+    }
+    const { data: maxRow } = await supabase
+      .from('proposal_items')
+      .select('sort_order')
+      .eq('proposal_id', proposalId)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const nextSortOrder =
+      maxRow && typeof (maxRow as { sort_order: number }).sort_order === 'number'
+        ? (maxRow as { sort_order: number }).sort_order + 1
+        : 0;
+    return { ok: true, proposalId, nextSortOrder };
+  }
+
+  const { data: inserted, error: insertError } = await supabase
+    .from('proposals')
+    .insert({
+      workspace_id: workspaceId,
+      deal_id: dealId,
+      status: 'draft',
+      public_token: crypto.randomUUID(),
+    })
+    .select('id')
+    .single();
+  if (insertError || !inserted?.id) {
+    return { ok: false, error: insertError?.message ?? 'Failed to create proposal.' };
+  }
+  return { ok: true, proposalId: inserted.id as string, nextSortOrder: 0 };
+}
+
+// =============================================================================
 
 export interface AddPackageToProposalResult {
   success: boolean;
@@ -443,88 +545,13 @@ export async function addPackageToProposal(
 
   const packageInstanceId = crypto.randomUUID();
 
-  // Duplicate-draft guard — see header comment. Look up ALL live (non-superseded)
-  // proposals for the deal so we can distinguish three cases:
-  //   1. Live draft exists           → reuse it.
-  //   2. Live sent/viewed/accepted   → fail loudly; caller must revise.
-  //   3. Nothing live                → create a fresh draft.
-  const { data: livePropRows } = await supabase
-    .from('proposals')
-    .select('id, status, superseded_at')
-    .eq('deal_id', dealId)
-    .is('superseded_at', null)
-    .order('created_at', { ascending: false });
-
-  const liveRows = (livePropRows ?? []) as { id: string; status: string; superseded_at: string | null }[];
-  const liveDraft = liveRows.find((r) => r.status === 'draft') ?? null;
-  const liveActive = liveRows.find((r) => r.status !== 'draft') ?? null;
-
-  if (!liveDraft && liveActive) {
-    return {
-      success: false,
-      error: `Deal already has a ${liveActive.status} proposal. Use sendProposalRevision to start a new draft.`,
-    };
-  }
-
-  const existing = liveDraft ? { id: liveDraft.id } : null;
-
-  let proposalId: string;
-  let nextSortOrder: number;
-
-  if (existing?.id) {
-    proposalId = existing.id;
-    if (insertAfterSortOrder != null) {
-      // Insert in the middle: shift all rows with sort_order > insertAfterSortOrder
-      // down by the number of rows we're about to add, then insert at the gap.
-      const rowsCount = expanded.length === 1 ? 1 : 1 + expanded.length;
-      const { data: toShift } = await supabase
-        .from('proposal_items')
-        .select('id, sort_order')
-        .eq('proposal_id', proposalId)
-        .gt('sort_order', insertAfterSortOrder)
-        .order('sort_order', { ascending: false });
-      if (toShift && toShift.length > 0) {
-        // Update in reverse order so temporary collisions can't violate any future
-        // UNIQUE(proposal_id, sort_order) constraint (none today, but future-proof).
-        for (const row of toShift as { id: string; sort_order: number }[]) {
-          await supabase
-            .from('proposal_items')
-            .update({ sort_order: row.sort_order + rowsCount })
-            .eq('id', row.id);
-        }
-      }
-      nextSortOrder = insertAfterSortOrder + 1;
-    } else {
-      const { data: maxRow } = await supabase
-        .from('proposal_items')
-        .select('sort_order')
-        .eq('proposal_id', proposalId)
-        .order('sort_order', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      nextSortOrder = (maxRow && typeof (maxRow as { sort_order: number }).sort_order === 'number'
-        ? (maxRow as { sort_order: number }).sort_order + 1
-        : 0);
-    }
-  } else {
-    const publicToken = crypto.randomUUID();
-    const { data: inserted, error: insertError } = await supabase
-      .from('proposals')
-      .insert({
-        workspace_id: workspaceId,
-        deal_id: dealId,
-        status: 'draft',
-        public_token: publicToken,
-      })
-      .select('id')
-      .single();
-    if (insertError || !inserted?.id) {
-      return { success: false, error: insertError?.message ?? 'Failed to create proposal.' };
-    }
-    proposalId = inserted.id;
-    nextSortOrder = 0;
-  }
-
+  const rowsCount = expanded.length === 1 ? 1 : 1 + expanded.length;
+  const placement = await resolveDraftInsertPoint(
+    supabase, dealId, workspaceId, insertAfterSortOrder, rowsCount,
+  );
+  if (!placement.ok) return { success: false, error: placement.error };
+  const proposalId = placement.proposalId;
+  const nextSortOrder = placement.nextSortOrder;
   // Single-item packages: skip the header+child structure — just add a flat line item at bundle price.
   // Multi-item packages: insert a bundle header row then children at $0 (Tagged Bursting pattern).
   let rowsToInsert: object[];
@@ -616,6 +643,120 @@ export async function addPackageToProposal(
 
 // =============================================================================
 // getPackages(workspaceId): Fetch all active packages for a workspace
+// =============================================================================
+// addCustomItemToProposal — a line item with no catalog entry behind it
+// =============================================================================
+
+export interface CustomProposalItemInput {
+  name: string;
+  description?: string | null;
+  quantity?: number;
+  unitPrice: number;
+  /** Matches proposal_items.unit_type; 'flat' unless the caller says otherwise. */
+  unitType?: string;
+  isTaxable?: boolean;
+  /** Internal cost, for margin reporting. Never shown to the client. */
+  actualCost?: number | null;
+  /**
+   * Line-item category, mirroring package_category. Feeds margin reporting the
+   * same way a catalog-sourced row does; falls back to 'custom' when the caller
+   * has nothing better to say.
+   */
+  category?: string | null;
+  /**
+   * Set when the item was also saved to the catalog. The row then behaves like
+   * any catalog-sourced line downstream (gear planning, crew roles, variance)
+   * instead of being invisible to them.
+   */
+  originPackageId?: string | null;
+  insertAfterSortOrder?: number | null;
+}
+
+/**
+ * Add a one-off line item to the deal's draft proposal.
+ *
+ * Not everything sold exists in the catalog -- a client-specific build, a
+ * subrental, a negotiated fee. Previously the builder could only insert catalog
+ * packages, so anything not already in the gear catalog could not be quoted at
+ * all without first creating a permanent catalog entry for it.
+ *
+ * With no `originPackageId`, the row is stored with origin_package_id and
+ * package_id NULL. Every consumer of those columns already treats them as
+ * nullable (`origin_package_id ?? package_id`, then filtered), so a one-off item
+ * simply contributes no gear or crew requirements downstream -- which is correct
+ * for a free-form line.
+ *
+ * When the caller also saved the item to the catalog, it passes the new
+ * package's id as `originPackageId` and the row joins the normal catalog-linked
+ * behaviour instead.
+ */
+export async function addCustomItemToProposal(
+  dealId: string,
+  input: CustomProposalItemInput,
+): Promise<{ success: true; proposalId: string; itemId: string } | { success: false; error: string }> {
+  const name = input.name?.trim();
+  if (!name) return { success: false, error: 'Give the item a name.' };
+
+  const quantity = Number.isFinite(Number(input.quantity)) ? Math.max(1, Math.trunc(Number(input.quantity))) : 1;
+  const unitPrice = Number.isFinite(Number(input.unitPrice)) ? Number(input.unitPrice) : NaN;
+  if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+    return { success: false, error: 'Enter a price of zero or more.' };
+  }
+
+  const supabase = await createClient();
+  const workspaceId = await resolveWorkspaceIdFromDeal(supabase, dealId);
+  if (!workspaceId) {
+    return { success: false, error: 'Deal not found or workspace could not be resolved.' };
+  }
+
+  const placement = await resolveDraftInsertPoint(
+    supabase, dealId, workspaceId, input.insertAfterSortOrder, 1,
+  );
+  if (!placement.ok) return { success: false, error: placement.error };
+
+  const { data: inserted, error } = await supabase
+    .from('proposal_items')
+    .insert({
+      proposal_id: placement.proposalId,
+      package_id: null,
+      origin_package_id: input.originPackageId ?? null,
+      // Its own instance id keeps grouping/deletion behaving like any other row.
+      package_instance_id: crypto.randomUUID(),
+      display_group_name: null,
+      is_client_visible: true,
+      is_package_header: false,
+      original_base_price: unitPrice,
+      unit_type: input.unitType ?? 'flat',
+      unit_multiplier: 1,
+      name,
+      description: input.description?.trim() || null,
+      quantity,
+      unit_price: unitPrice,
+      override_price: null,
+      actual_cost: input.actualCost != null && Number.isFinite(Number(input.actualCost))
+        ? Number(input.actualCost)
+        : null,
+      time_start: null,
+      time_end: null,
+      show_times_on_proposal: true,
+      definition_snapshot: buildSnapshot({
+        category: input.category?.trim() || 'custom',
+        isTaxable: input.isTaxable ?? true,
+      }),
+      sort_order: placement.nextSortOrder,
+    })
+    .select('id')
+    .single();
+
+  if (error || !inserted?.id) {
+    return { success: false, error: error?.message ?? 'Failed to add the item.' };
+  }
+
+  // No revalidatePath here: the builder refreshes through onItemAdded(), the
+  // same way addPackageToProposal does.
+  return { success: true, proposalId: placement.proposalId, itemId: inserted.id as string };
+}
+
 // =============================================================================
 
 export async function getPackages(workspaceId: string): Promise<GetPackagesResult> {

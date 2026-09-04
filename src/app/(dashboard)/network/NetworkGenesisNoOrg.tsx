@@ -11,9 +11,6 @@ import {
   SheetClose,
   SheetBody,
 } from '@/shared/ui/sheet';
-
-const noopUnpin = async () => ({ ok: true } as const);
-
 /**
  * When user has no org (getCurrentOrgId() null), show the same 3-card Genesis view
  * so refresh doesn’t drop them to the single “Initialize Studio” card.
@@ -38,7 +35,6 @@ export function NetworkGenesisNoOrg() {
       <div className="flex flex-1 min-h-0">
         <StreamLayout
           nodes={[]}
-          onUnpin={noopUnpin}
           hasIdentity={false}
           brandColor={null}
           onOpenProfile={() => setSheetOpen(true)}

@@ -49,6 +49,10 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
     && node.relationshipType !== 'CLIENT';
   const isCore = node.gravity === 'core' || isFreelancerPerson;
   const isPartner = node.kind === 'external_partner' && !isFreelancerPerson;
+  // Two different things that used to be one flag:
+  //   starred  — this user's personal pin (cortex.network_stars). Silent.
+  //   preferred — the workspace's shared tier judgement on the relationship.
+  const isStarred = node.starred === true;
   const isPreferred = node.gravity === 'inner_circle';
 
   // Completeness pill: only for person nodes (team members)
@@ -66,7 +70,7 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
         })
       : null;
 
-  const handleTogglePreferred = (e: React.MouseEvent) => {
+  const handleToggleStar = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     onTogglePreferred?.(node.id);
@@ -81,30 +85,39 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
 
   const content = (
     <>
-      {isPartner && onTogglePreferred ? (
+      {/* Star — this user's own pin. Available on every card, not just
+          partners: anyone can be someone you look at a lot. */}
+      {onTogglePreferred && (
         <button
           type="button"
-          onClick={handleTogglePreferred}
+          onClick={handleToggleStar}
           className={`absolute top-2.5 left-2.5 z-10 rounded p-1 transition-colors duration-[80ms] ${
-            isPreferred
+            isStarred
               ? 'text-[var(--stage-text-primary)]'
-              : 'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)]/70'
+              : 'text-[var(--stage-text-tertiary)] opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[var(--stage-text-primary)]/70'
           }`}
-          title={isPreferred ? 'Remove from preferred' : 'Mark as preferred'}
-          aria-label={isPreferred ? 'Remove from preferred' : 'Mark as preferred'}
-          aria-pressed={isPreferred}
+          title={isStarred ? 'Remove star' : 'Star for quick access'}
+          aria-label={isStarred ? 'Remove star' : 'Star for quick access'}
+          aria-pressed={isStarred}
         >
           <Star
             size={14}
             strokeWidth={1.5}
-            className={isPreferred ? 'fill-[var(--stage-text-primary)]' : ''}
+            className={isStarred ? 'fill-[var(--stage-text-primary)]' : ''}
           />
         </button>
-      ) : isPartner && isPreferred ? (
-        <span className="absolute top-2.5 left-2.5 text-[var(--stage-text-primary)]" aria-label="Preferred partner">
-          <Star size={14} strokeWidth={1.5} className="fill-[var(--stage-text-primary)]" />
+      )}
+
+      {/* Preferred — the workspace's shared judgement, shown as a quiet badge
+          rather than a control. Changing it is a deliberate act elsewhere. */}
+      {isPartner && isPreferred && (
+        <span
+          className="absolute top-2.5 right-2.5 z-10 rounded-[var(--stage-radius-input,6px)] border border-[var(--stage-edge-subtle)] bg-[oklch(1_0_0_/_0.06)] px-1.5 py-px stage-badge-text text-[var(--stage-text-secondary)]"
+          title="Preferred — a shared workspace judgement"
+        >
+          Preferred
         </span>
-      ) : null}
+      )}
       {isCore && node.meta.doNotRebook && (
         <span
           className="absolute top-3 right-3 size-2 rounded-full bg-[var(--color-unusonic-warning)]"

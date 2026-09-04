@@ -2,6 +2,7 @@
  
 
 import { createClient } from '@/shared/api/supabase/server';
+import { resolveWorkspaceOrgEntityId } from '@/entities/organization/api/resolve-workspace-org-entity';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { PERSON_ATTR, VENUE_ATTR, INDIVIDUAL_ATTR } from '@/features/network-data/model/attribute-keys';
 
@@ -163,20 +164,11 @@ export async function createGhostVenueEntity(name: string): Promise<string | nul
     const entityId = (entity as { id: string }).id;
 
     // Resolve workspace org entity for the cortex edge
-    const { data: workspaceOrgEntity } = await supabase
-      .schema('directory')
-      .from('entities')
-      .select('id')
-      .eq('owner_workspace_id', workspaceId)
-      .eq('type', 'company')
-      // NULL-safe: match entities where is_ghost is absent OR explicitly not 'true'.
-      // `.neq(...)` alone treats NULL as excluded and silently drops pre-ghost-protocol orgs.
-      .or('attributes->>is_ghost.is.null,attributes->>is_ghost.neq.true')
-      .maybeSingle();
+    const workspaceOrgEntityId = await resolveWorkspaceOrgEntityId(supabase, workspaceId);
 
-    if (workspaceOrgEntity?.id) {
+    if (workspaceOrgEntityId) {
       await supabase.rpc('upsert_relationship', {
-        p_source_entity_id: workspaceOrgEntity.id,
+        p_source_entity_id: workspaceOrgEntityId,
         p_target_entity_id: entityId,
         p_type: 'VENUE_PARTNER',
         p_context_data: { deleted_at: null, lifecycle_status: 'active' },
@@ -261,20 +253,11 @@ export async function createGhostPlannerEntity(name: string): Promise<string | n
     if (error || !entity) return null;
     const entityId = (entity as { id: string }).id;
 
-    const { data: workspaceOrgEntity } = await supabase
-      .schema('directory')
-      .from('entities')
-      .select('id')
-      .eq('owner_workspace_id', workspaceId)
-      .eq('type', 'company')
-      // NULL-safe: match entities where is_ghost is absent OR explicitly not 'true'.
-      // `.neq(...)` alone treats NULL as excluded and silently drops pre-ghost-protocol orgs.
-      .or('attributes->>is_ghost.is.null,attributes->>is_ghost.neq.true')
-      .maybeSingle();
+    const workspaceOrgEntityId = await resolveWorkspaceOrgEntityId(supabase, workspaceId);
 
-    if (workspaceOrgEntity?.id) {
+    if (workspaceOrgEntityId) {
       await supabase.rpc('upsert_relationship', {
-        p_source_entity_id: workspaceOrgEntity.id,
+        p_source_entity_id: workspaceOrgEntityId,
         p_target_entity_id: entityId,
         p_type: 'PARTNER',
         p_context_data: { deleted_at: null, lifecycle_status: 'active' },
@@ -317,23 +300,14 @@ export async function createGhostReferrerEntity(name: string): Promise<{ id: str
     if (error || !entity) return null;
     const entityId = (entity as { id: string }).id;
 
-    const { data: workspaceOrgEntity } = await supabase
-      .schema('directory')
-      .from('entities')
-      .select('id')
-      .eq('owner_workspace_id', workspaceId)
-      .eq('type', 'company')
-      // NULL-safe: match entities where is_ghost is absent OR explicitly not 'true'.
-      // `.neq(...)` alone treats NULL as excluded and silently drops pre-ghost-protocol orgs.
-      .or('attributes->>is_ghost.is.null,attributes->>is_ghost.neq.true')
-      .maybeSingle();
+    const workspaceOrgEntityId = await resolveWorkspaceOrgEntityId(supabase, workspaceId);
 
-    if (workspaceOrgEntity?.id) {
+    if (workspaceOrgEntityId) {
       await supabase.rpc('upsert_relationship', {
-        p_source_entity_id: workspaceOrgEntity.id,
+        p_source_entity_id: workspaceOrgEntityId,
         p_target_entity_id: entityId,
         p_type: 'PARTNER',
-        p_context_data: { deleted_at: null, lifecycle_status: 'active', tier: 'preferred' },
+        p_context_data: { deleted_at: null, lifecycle_status: 'active', tier: 'standard' },
       });
     }
 
@@ -370,20 +344,11 @@ export async function createGhostClientEntity(name: string): Promise<string | nu
     if (error || !entity) return null;
     const entityId = (entity as { id: string }).id;
 
-    const { data: workspaceOrgEntity } = await supabase
-      .schema('directory')
-      .from('entities')
-      .select('id')
-      .eq('owner_workspace_id', workspaceId)
-      .eq('type', 'company')
-      // NULL-safe: match entities where is_ghost is absent OR explicitly not 'true'.
-      // `.neq(...)` alone treats NULL as excluded and silently drops pre-ghost-protocol orgs.
-      .or('attributes->>is_ghost.is.null,attributes->>is_ghost.neq.true')
-      .maybeSingle();
+    const workspaceOrgEntityId = await resolveWorkspaceOrgEntityId(supabase, workspaceId);
 
-    if (workspaceOrgEntity?.id) {
+    if (workspaceOrgEntityId) {
       await supabase.rpc('upsert_relationship', {
-        p_source_entity_id: workspaceOrgEntity.id,
+        p_source_entity_id: workspaceOrgEntityId,
         p_target_entity_id: entityId,
         p_type: 'CLIENT',
         p_context_data: { deleted_at: null, lifecycle_status: 'active' },
@@ -423,20 +388,11 @@ export async function createGhostVendorEntity(name: string): Promise<string | nu
     if (error || !entity) return null;
     const entityId = (entity as { id: string }).id;
 
-    const { data: workspaceOrgEntity } = await supabase
-      .schema('directory')
-      .from('entities')
-      .select('id')
-      .eq('owner_workspace_id', workspaceId)
-      .eq('type', 'company')
-      // NULL-safe: match entities where is_ghost is absent OR explicitly not 'true'.
-      // `.neq(...)` alone treats NULL as excluded and silently drops pre-ghost-protocol orgs.
-      .or('attributes->>is_ghost.is.null,attributes->>is_ghost.neq.true')
-      .maybeSingle();
+    const workspaceOrgEntityId = await resolveWorkspaceOrgEntityId(supabase, workspaceId);
 
-    if (workspaceOrgEntity?.id) {
+    if (workspaceOrgEntityId) {
       await supabase.rpc('upsert_relationship', {
-        p_source_entity_id: workspaceOrgEntity.id,
+        p_source_entity_id: workspaceOrgEntityId,
         p_target_entity_id: entityId,
         p_type: 'VENDOR',
         p_context_data: { deleted_at: null, lifecycle_status: 'active' },

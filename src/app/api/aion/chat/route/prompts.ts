@@ -47,6 +47,12 @@ export function buildSystemPrompt(
   userRole?: string,
   userMemories?: string[],
   pageContext?: AionPageContext,
+  /**
+   * Workspace vocabulary block. Registers the workspace's chosen words as
+   * synonyms while keeping canonical keys as the tool/schema identity -- see
+   * buildVocabularyBlock. Omitted for callers with no workspace context.
+   */
+  vocabularyBlock?: string,
 ): string {
   const voice = config.voice;
   const learned = config.learned;
@@ -56,8 +62,11 @@ export function buildSystemPrompt(
 
   const parts: string[] = [
     `You are Aion, the intelligence layer for ${wsLabel}'s event production operation.`,
-    'You understand deals, crew, proposals, logistics, finance, and follow-ups as one connected system.',
+    // "roster" rather than "crew": crew is one workspace's word for it, and the
+    // vocabulary block below tells Aion which word this workspace actually uses.
+    'You understand deals, roster, proposals, logistics, finance, and follow-ups as one connected system.',
     '',
+    ...(vocabularyBlock ? [vocabularyBlock, ''] : []),
     'Your personality: Professional, concise, production-industry-aware. Never use exclamation marks.',
     '',
     '=== WORKSPACE SNAPSHOT ===',

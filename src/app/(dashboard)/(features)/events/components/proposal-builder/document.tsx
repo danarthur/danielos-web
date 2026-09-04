@@ -625,6 +625,16 @@ export function DocumentBody({
   venue: { name: string; address: string | null } | null;
   dealCrew: DealCrewRow[];
 }) {
+  // A clicked row maps back to its scope block: consolidateBundleItems collapses
+  // bundle children onto their header, and every block -- bundle header or flat
+  // line -- carries headerItemId, so one lookup covers both shapes.
+  const handleItemClick = (itemId: string) => {
+    const idx = scopeBlocks.findIndex((b) => b.headerItemId === itemId);
+    if (idx >= 0) onSelectBlock?.(idx);
+  };
+  const selectedItemId =
+    selectedBlockIdx != null ? scopeBlocks[selectedBlockIdx]?.headerItemId ?? null : null;
+
   // True WYSIWYG: render the actual public proposal components composed the
   // same way the client sees them. Builder-only chrome (sign panel, deposit
   // step, "It's a Date" celebratory state) is replaced with a builder notice.
@@ -702,6 +712,12 @@ export function DocumentBody({
           layout={itemLayout}
           sectionBgAlternate={sectionBgAlternate}
           sectionTrim={sectionTrim}
+          // Clicking a line in the proposal selects it, which opens the
+          // inspector on that item -- the reverse trip (find the row in the
+          // inspector list first) is the unintuitive one. Only wired in the
+          // builder; the client-facing proposal passes neither prop.
+          onItemClick={onSelectBlock ? handleItemClick : undefined}
+          selectedItemId={selectedItemId}
         />
       </section>
 

@@ -3,6 +3,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
+import { resolveWorkspaceOrgEntityId } from '@/entities/organization/api/resolve-workspace-org-entity';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { displayableEmail } from '@/shared/lib/entity-attrs';
 import type { DealStakeholderRole } from '../lib/stakeholder-roles';
@@ -185,19 +186,12 @@ export async function getDealStakeholders(dealId: string): Promise<DealStakehold
     const dirIdToRelId = new Map<string, string>();
     const allDirOrgIds = [...new Set([...orgMap.values()].map((v) => v.dirId))];
     if (allDirOrgIds.length > 0) {
-      const { data: wsOrg } = await supabase
-        .schema('directory').from('entities')
-        .select('id')
-        .eq('owner_workspace_id', workspaceId)
-        .eq('type', 'company')
-        // NULL-safe: .neq() alone treats NULL as excluded, silently dropping pre-ghost-protocol orgs.
-        .or('attributes->>is_ghost.is.null,attributes->>is_ghost.neq.true')
-        .maybeSingle();
-      if (wsOrg?.id) {
+      const wsOrgId = await resolveWorkspaceOrgEntityId(supabase, workspaceId);
+      if (wsOrgId) {
         const { data: cortexRels } = await supabase
           .schema('cortex').from('relationships')
           .select('id, target_entity_id')
-          .eq('source_entity_id', wsOrg.id)
+          .eq('source_entity_id', wsOrgId)
           .in('target_entity_id', allDirOrgIds)
           .in('relationship_type', ['CLIENT', 'VENDOR', 'VENUE_PARTNER', 'PARTNER']);
         for (const rel of cortexRels ?? []) {

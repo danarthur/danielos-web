@@ -6,6 +6,7 @@
 'use server';
 
 import 'server-only';
+import { buildAddressPatch } from '@/shared/lib/entity-address';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
@@ -156,7 +157,18 @@ export async function updateGhostProfile(
     [COMPANY_ATTR.support_email]: supportEmail?.trim() || null,
     [COMPANY_ATTR.default_currency]: defaultCurrency?.trim() || null,
     [COMPANY_ATTR.operational_settings]: ops,
-    ...(address !== null ? { [COMPANY_ATTR.address]: address } : {}),
+    // Write every address shape, not just the nested object: formatted_address
+    // feeds the client-facing proposal and the event's venue address, so an
+    // address corrected here used to stay stale on both.
+    ...(address !== null
+      ? buildAddressPatch({
+          street: address.street ?? '',
+          city: address.city ?? '',
+          state: address.state ?? '',
+          postal_code: address.postal_code ?? '',
+          country: address.country ?? '',
+        })
+      : {}),
     ...(category !== null ? { [COMPANY_ATTR.category]: category } : {}),
   };
 

@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.5"
   }
   aion: {
     Tables: {
@@ -707,6 +707,27 @@ export type Database = {
           next_attempt_after?: string
           source_id?: string
           source_type?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      network_stars: {
+        Row: {
+          created_at: string
+          entity_id: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          user_id?: string
           workspace_id?: string
         }
         Relationships: []
@@ -1450,6 +1471,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      entity_address_text: { Args: { p_attrs: Json }; Returns: string }
       upsert_entity_working_notes: {
         Args: {
           p_communication_style?: string

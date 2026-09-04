@@ -78,6 +78,14 @@ interface SheetContentProps {
   side?: 'left' | 'right' | 'center';
   /** Use when there is no visible `SheetTitle` — sets `aria-label` on the sheet surface. */
   ariaLabel?: string;
+  /**
+   * Surface level of the panel, used to resolve --ctx-well / --ctx-card for
+   * everything inside. Defaults to 'raised', matching the default panel
+   * background. Sheets that override the background (e.g. to
+   * --stage-surface) must declare it, or their inputs resolve a well that is
+   * lighter than the panel instead of recessed below it.
+   */
+  surface?: 'surface' | 'elevated' | 'raised';
 }
 
 const slideVariants = {
@@ -99,7 +107,13 @@ const slideVariants = {
 };
 
 /** Single portaled root = reliable visibility. Without it, panel can disappear when portaling a fragment. */
-function SheetContent({ children, className, side = 'center', ariaLabel }: SheetContentProps) {
+function SheetContent({
+  children,
+  className,
+  side = 'center',
+  ariaLabel,
+  surface = 'raised',
+}: SheetContentProps) {
   const { open, onOpenChange } = useSheet();
   const variants = slideVariants[side];
   const isCenter = side === 'center';
@@ -133,6 +147,11 @@ function SheetContent({ children, className, side = 'center', ariaLabel }: Sheet
             ref={containerRef}
             key="sheet-panel"
             role="dialog"
+            // The panel is portaled to document.body, so it inherits no
+            // [data-surface] ancestor and --ctx-well would fall back to :root
+            // (nested, 0.09) -- inputs render near-black against a 0.26 panel.
+            // Declaring the level here fixes every sheet at once.
+            data-surface={surface}
             aria-modal
             aria-label={ariaLabel}
             aria-labelledby={ariaLabel ? undefined : titleId}
@@ -180,7 +199,7 @@ function SheetFooter({ children, className }: { children: React.ReactNode; class
   return (
     <div
       className={cn(
-        'shrink-0 border-t border-[oklch(1_0_0_/_0.06)] bg-[var(--stage-surface)] px-6 py-5',
+        'shrink-0 border-t border-[var(--stage-edge-subtle)] px-6 py-5',
         className
       )}
     >

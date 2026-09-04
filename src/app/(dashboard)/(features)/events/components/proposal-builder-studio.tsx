@@ -177,7 +177,10 @@ export function ProposalBuilderStudio({
 
   const handleSelectBlock = useCallback(
     (idx: number) => {
-      setSelectedBlockIdx((prev) => (prev === idx ? null : idx));
+      // Selecting is not a toggle: clicking a line you are already editing
+      // should keep the inspector on it, not close it out from under you.
+      // Clearing happens through onClearSelection instead.
+      setSelectedBlockIdx(idx);
       // If the sidebar is closed, pop it open so the inspector is visible.
       if (!sidebarOpen) {
         setSidebarOpen(true);

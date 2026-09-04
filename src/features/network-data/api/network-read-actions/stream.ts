@@ -8,6 +8,7 @@
 import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
 import type { NetworkNode } from '@/entities/network';
+import { mergeNodesByEntity } from './merge-nodes';
 import { PERSON_ATTR, COUPLE_ATTR } from '../../model/attribute-keys';
 import { ROLE_ORDER, getCurrentEntityAndOrg } from '../network-helpers';
 
@@ -23,7 +24,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
   // Get org directory entity
   const { data: orgDirEnt } = await supabase
     .schema('directory').from('entities')
-    .select('id').eq('legacy_org_id', orgId).maybeSingle();
+    .select('id, owner_workspace_id').eq('legacy_org_id', orgId).maybeSingle();
   if (!orgDirEnt) return [];
 
   // Verify caller is a member of the requested org (cortex check)
@@ -90,7 +91,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     // Crew skills from ops.crew_skills (source of truth)
     allPersonEntityIds.length > 0
       ? supabase.schema('ops').from('crew_skills')
-          .select('entity_id, skill_tag')
+          .select('entity_id, skill_tag, role_tag')
           .in('entity_id', allPersonEntityIds)
           .eq('workspace_id', orgId)
       : { data: [] as { entity_id: string; skill_tag: string }[] },
@@ -113,10 +114,21 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
 
   // Build skills map from ops.crew_skills
   const crewSkillsByEntityId = new Map<string, string[]>();
+  // Crew roles come from the same rows: role_tag is the controlled value that
+  // grouping reads, while skill_tag keeps whatever was originally typed. That
+  // is what lets historic 'dj' and 'DJ' rows group as one role.
+  const crewRolesByEntityId = new Map<string, string[]>();
   for (const row of crewSkillsRes.data ?? []) {
     const list = crewSkillsByEntityId.get(row.entity_id) ?? [];
     list.push(row.skill_tag);
     crewSkillsByEntityId.set(row.entity_id, list);
+
+    const roleTag = (row as { role_tag?: string | null }).role_tag;
+    if (roleTag) {
+      const roles = crewRolesByEntityId.get(row.entity_id) ?? [];
+      if (!roles.includes(roleTag)) roles.push(roleTag);
+      crewRolesByEntityId.set(row.entity_id, roles);
+    }
   }
 
   // Build capabilities map from ops.entity_capabilities
@@ -320,5 +332,50 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     };
   }).sort((a, b) => a.identity.name.localeCompare(b.identity.name));
 
-  return [...coreNodes, ...extendedTeamNodes, ...innerCircleNodes, ...outerOrbitNodes];
+  // Stars are per-user, so they are attached after the shared node set is built.
+  const starredIds = await fetchStarredEntityIds(
+    supabase,
+    (orgDirEnt as { owner_workspace_id?: string | null }).owner_workspace_id ?? null,
+  );
+
+  return withCrewRoles(crewRolesByEntityId, withStars(starredIds, mergeNodesByEntity([
+    ...coreNodes,
+    ...extendedTeamNodes,
+    ...innerCircleNodes,
+    ...outerOrbitNodes,
+  ])));
+}
+
+/** Entity ids the signed-in user has starred in this workspace. */
+async function fetchStarredEntityIds(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  workspaceId: string | null,
+): Promise<Set<string>> {
+  if (!workspaceId) return new Set();
+  const { data: auth } = await supabase.auth.getUser();
+  const userId = auth?.user?.id;
+  if (!userId) return new Set();
+
+  const { data } = await supabase
+    .schema('cortex')
+    .from('network_stars')
+    .select('entity_id')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', userId);
+
+  return new Set(((data ?? []) as { entity_id: string }[]).map((r) => r.entity_id));
+}
+
+function withStars(starred: Set<string>, nodes: NetworkNode[]): NetworkNode[] {
+  if (starred.size === 0) return nodes;
+  return nodes.map((n) => (starred.has(n.entityId) ? { ...n, starred: true } : n));
+}
+
+function withCrewRoles(roles: Map<string, string[]>, nodes: NetworkNode[]): NetworkNode[] {
+  if (roles.size === 0) return nodes;
+  return nodes.map((n) => {
+    const r = roles.get(n.entityId);
+    return r?.length ? { ...n, crewRoles: r } : n;
+  });
 }

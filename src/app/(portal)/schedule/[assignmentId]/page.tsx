@@ -6,6 +6,7 @@
 import { notFound } from 'next/navigation';
 import { createClient } from '@/shared/api/supabase/server';
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
+import { readEntityAddress, formatEntityAddress } from '@/shared/lib/entity-address';
 import { resolveGigProfile, resolvePortalProfile } from '@/shared/lib/portal-profiles';
 import { format } from 'date-fns';
 import { GigDetailShell } from './gig-detail-shell';
@@ -263,17 +264,26 @@ export default async function GigDetailPage({
   let venueCrewData: VenueCrewData | null = null;
   let venueEntityDockInfo: string | null = null;
   let venueEntityPowerInfo: string | null = null;
+  // The venue entity is the source of truth for name and address; ops.events
+  // only carries a snapshot written at link time and never refreshed.
+  let venueEntityName: string | null = null;
+  let venueEntityAddress: string | null = null;
 
   if (event.venue_entity_id) {
     const { data: venueEntity } = await supabase
       .schema('directory')
       .from('entities')
-      .select('attributes')
+      .select('display_name, attributes')
       .eq('id', event.venue_entity_id)
       .maybeSingle();
 
     if (venueEntity) {
       const venueAttrs = readEntityAttrs(venueEntity.attributes, 'venue');
+      venueEntityName = (venueEntity.display_name as string | null) ?? null;
+      venueEntityAddress =
+        formatEntityAddress(
+          readEntityAddress(venueEntity.attributes as Record<string, unknown>),
+        ) || null;
 
       venueCrewData = {
         dockAddress: venueAttrs.dock_address ?? null,
@@ -392,8 +402,11 @@ export default async function GigDetailPage({
   const showDayContacts = (event.show_day_contacts ?? []) as { role: string; name: string; phone: string | null; email: string | null }[];
 
   // Venue
-  let venueName: string | null = event.venue_name || event.location_name || null;
-  let venueAddress: string | null = event.venue_address || event.location_address || null;
+  // Entity first, snapshot only as a fallback for events with no linked venue.
+  let venueName: string | null =
+    venueEntityName || event.venue_name || event.location_name || null;
+  let venueAddress: string | null =
+    venueEntityAddress || event.venue_address || event.location_address || null;
   let mapsUrl: string | null = venueAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venueAddress)}` : null;
 
   // Notes
