@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     return genericSuccess();
   }
 
-  const cancelUrl = `${baseUrl.replace(/\/$/, '')}/auth/recover/cancel?token=${encodeURIComponent(token)}`;
+  const cancelUrl = `${baseUrl.replace(/\/$/, '')}/recover/cancel?token=${encodeURIComponent(token)}`;
   await sendRecoveryVetoEmail(email, cancelUrl);
 
   return genericSuccess();

@@ -330,6 +330,7 @@ export async function createGhostOrganization(
       .eq('source_entity_id', creatorPersonEnt.id)
       .eq('target_entity_id', orgEnt.id)
       .in('relationship_type', ['ROSTER_MEMBER', 'MEMBER'])
+      .is('ended_at', null)
       .maybeSingle();
     if (!rel) {
       return { ok: false, error: 'You are not a member of the selected creator organization.' };

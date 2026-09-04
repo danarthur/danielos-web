@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { StreamLayout } from '@/widgets/network-stream';
 import { networkQueries } from '@/features/network-data/api/queries';
+import { starEntity, unstarEntity } from '@/features/network-data';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 import type { NetworkNode } from '@/entities/network';
+import type { LabelPack } from '@/entities/network/model/label-packs';
 
 interface NetworkOrbitViewProps {
   nodes: NetworkNode[];
-  onUnpin: (relationshipId: string) => Promise<{ ok: boolean; error?: string }>;
-  onPin: (relationshipId: string) => Promise<{ ok: boolean; error?: string }>;
+
   sourceOrgId: string;
   /** When true, Genesis Card 1 shows as completed (Establish Identity done). */
   hasIdentity?: boolean;
@@ -21,12 +22,14 @@ interface NetworkOrbitViewProps {
   brandColor?: string | null;
   onOpenOmni?: () => void;
   onOpenProfile?: () => void;
+  labelPack?: LabelPack;
+  roleLabels?: Record<string, string>;
 }
 
 /**
  * Client wrapper: card click pushes ?nodeId=&kind= to URL; sheet is driven by details from server.
  */
-export function NetworkOrbitView({ nodes, onUnpin, onPin, sourceOrgId, hasIdentity = false, hasTeam = false, brandColor = null, onOpenOmni, onOpenProfile }: NetworkOrbitViewProps) {
+export function NetworkOrbitView({ nodes, sourceOrgId, hasIdentity = false, hasTeam = false, brandColor = null, onOpenOmni, onOpenProfile, labelPack, roleLabels }: NetworkOrbitViewProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { workspaceId } = useWorkspace();
@@ -49,14 +52,30 @@ export function NetworkOrbitView({ nodes, onUnpin, onPin, sourceOrgId, hasIdenti
     [queryClient, workspaceId, sourceOrgId],
   );
 
+  /**
+   * Stars are per-user rows keyed by entity, so the toggle lives here where the
+   * workspace is in context. It replaces the old pin/unpin pair, which wrote
+   * the shared relationship tier and so changed what every colleague saw.
+   */
+  const handleToggleStar = useCallback(
+    async (entityId: string, starred: boolean) => {
+      if (!workspaceId) return { ok: false, error: 'No workspace in context.' };
+      return starred
+        ? starEntity(workspaceId, entityId)
+        : unstarEntity(workspaceId, entityId);
+    },
+    [workspaceId],
+  );
+
   return (
     <>
       <StreamLayout
         nodes={nodes}
         onNodeClick={handleNodeClick}
         onNodeHover={handleNodeHover}
-        onUnpin={onUnpin}
-        onPin={onPin}
+        onToggleStar={handleToggleStar}
+        labelPack={labelPack}
+        roleLabels={roleLabels}
         hasIdentity={hasIdentity}
         hasTeam={hasTeam}
         brandColor={brandColor}

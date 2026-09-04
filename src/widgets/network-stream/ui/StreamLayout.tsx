@@ -3,47 +3,39 @@
 import { useCallback, useRef, useState, useTransition, useOptimistic } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ArrowUpDown, ChevronDown } from 'lucide-react';
+import { Search, ChevronDown, Star } from 'lucide-react';
 import { NetworkCard } from '@/entities/network';
 import { GenesisState } from './GenesisState';
 import { cn } from '@/shared/lib/utils';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import type { NetworkNode } from '@/entities/network';
+import { isInCategory, isUnsorted } from '@/entities/network/model/categories';
+import { categoryLabels, DEFAULT_LABEL_PACK, type LabelPack } from '@/entities/network/model/label-packs';
+import { CategorySection } from './CategorySection';
 
 // =============================================================================
 // Helpers: classify nodes into zones using existing kind/gravity/entityType
 // =============================================================================
 
-/** A node belongs to the Crew zone if it is roster (staff/contractor) OR a
- *  preferred freelancer person. CLIENT-edge persons are wedding hosts /
- *  individual clients and must NOT land in Crew. */
-function isCrewNode(n: NetworkNode): boolean {
-  if (n.kind === 'internal_employee' || n.kind === 'extended_team') return true;
-  // Preferred freelancer person — PARTNER/VENDOR edge with tier=preferred
-  // and entity type person. CLIENT-edge persons excluded.
-  if (
-    n.kind === 'external_partner'
-    && n.gravity === 'inner_circle'
-    && n.identity.entityType === 'person'
-    && n.relationshipType !== 'CLIENT'
-  ) return true;
-  return false;
+/**
+ * Zone membership is derived from role edges, never from `gravity`.
+ *
+ * The previous predicates all gated on `gravity === 'inner_circle'` -- the star
+ * -- so starring someone moved them between zones, and an unstarred client was
+ * indistinguishable from an unstarred freelancer. Membership now comes from
+ * categoriesOf(), and an entity holding several roles appears in each.
+ */
+function isRosterNode(n: NetworkNode): boolean {
+  return isInCategory(n, 'roster');
 }
 
-/** A node belongs to the Inner Circle zone if it is a preferred company/venue
- *  (not person), OR a CLIENT-edge person (couple, host, individual client). */
-function isInnerCircleNode(n: NetworkNode): boolean {
-  if (n.kind !== 'external_partner' || n.gravity !== 'inner_circle') return false;
-  // Company / venue / couple entities always live here.
-  if (n.identity.entityType !== 'person') return true;
-  // Person entities only if they're on a CLIENT edge; freelancer persons
-  // land in Crew via isCrewNode.
-  return n.relationshipType === 'CLIENT';
+function isClientNode(n: NetworkNode): boolean {
+  return isInCategory(n, 'clients');
 }
 
-/** Everything else is Network. */
-function isNetworkNode(n: NetworkNode): boolean {
-  return !isCrewNode(n) && !isInnerCircleNode(n);
+/** Vendors, venues, and anything holding no recognised role yet. */
+function isOtherNode(n: NetworkNode): boolean {
+  return isInCategory(n, 'vendors') || isInCategory(n, 'venues') || isUnsorted(n);
 }
 
 // =============================================================================
@@ -70,43 +62,10 @@ function groupByRole(nodes: NetworkNode[]): Map<string, NetworkNode[]> {
 }
 
 // =============================================================================
-// Network zone: filters and sorting
+// Category membership
 // =============================================================================
 
-type FilterId = 'all' | 'clients' | 'vendors' | 'venues' | 'partners';
-type SortId = 'relationship' | 'name';
 
-function getNetworkCounts(nodes: NetworkNode[]): Record<FilterId, number> {
-  return {
-    all: nodes.length,
-    clients:  nodes.filter((n) => n.identity.label === 'Client').length,
-    vendors:  nodes.filter((n) => n.identity.label === 'Vendor').length,
-    venues:   nodes.filter((n) => n.identity.label === 'Venue').length,
-    partners: nodes.filter((n) => !['Client', 'Vendor', 'Venue'].includes(n.identity.label ?? '')).length,
-  };
-}
-
-function applyFilter(nodes: NetworkNode[], filter: FilterId): NetworkNode[] {
-  switch (filter) {
-    case 'clients':   return nodes.filter((n) => n.identity.label === 'Client');
-    case 'vendors':   return nodes.filter((n) => n.identity.label === 'Vendor');
-    case 'venues':    return nodes.filter((n) => n.identity.label === 'Venue');
-    case 'partners':  return nodes.filter((n) => !['Client', 'Vendor', 'Venue'].includes(n.identity.label ?? ''));
-    default:          return nodes;
-  }
-}
-
-function applySort(nodes: NetworkNode[], sort: SortId): NetworkNode[] {
-  return [...nodes].sort((a, b) => a.identity.name.localeCompare(b.identity.name));
-}
-
-const FILTER_DEFS: { id: FilterId; label: string }[] = [
-  { id: 'all',       label: 'All' },
-  { id: 'clients',   label: 'Clients' },
-  { id: 'vendors',   label: 'Vendors' },
-  { id: 'venues',    label: 'Venues' },
-  { id: 'partners',  label: 'Partners' },
-];
 
 // =============================================================================
 // Optimistic updates
@@ -114,7 +73,7 @@ const FILTER_DEFS: { id: FilterId; label: string }[] = [
 
 type OptimisticAction =
   | { type: 'remove'; id: string }
-  | { type: 'toggle_preferred'; id: string; newGravity: 'inner_circle' | 'outer_orbit' };
+  | { type: 'toggle_star'; id: string; starred: boolean };
 
 // =============================================================================
 // Component
@@ -130,8 +89,15 @@ interface StreamLayoutProps {
    * anticipatory prefetch).
    */
   onNodeHover?: (node: NetworkNode) => void;
-  onUnpin?: (relationshipId: string) => Promise<{ ok: boolean; error?: string }>;
-  onPin?: (relationshipId: string) => Promise<{ ok: boolean; error?: string }>;
+  /**
+   * Toggle the current user's star on an entity. Personal and silent -- this
+   * replaces the old pin/unpin pair, which wrote the shared relationship tier.
+   */
+  onToggleStar?: (entityId: string, starred: boolean) => Promise<{ ok: boolean; error?: string }>;
+  /** Workspace display vocabulary. Category keys are unaffected. */
+  labelPack?: LabelPack;
+  /** Crew role slug -> label, for in-category role filtering. */
+  roleLabels?: Record<string, string>;
   hasIdentity?: boolean;
   hasTeam?: boolean;
   brandColor?: string | null;
@@ -143,8 +109,9 @@ export function StreamLayout({
   nodes,
   onNodeClick,
   onNodeHover,
-  onUnpin,
-  onPin,
+  onToggleStar,
+  labelPack = DEFAULT_LABEL_PACK,
+  roleLabels,
   hasIdentity = false,
   hasTeam = false,
   brandColor = null,
@@ -172,23 +139,19 @@ export function StreamLayout({
     }
   }, []);
   const [, startTransition] = useTransition();
-  const [activeFilter, setActiveFilter] = useState<FilterId>('all');
-  const [sort, setSort] = useState<SortId>('relationship');
   const [crewSearch, setCrewSearch] = useState('');
   const [innerCircleSearch, setInnerCircleSearch] = useState('');
-  const [networkSearch, setNetworkSearch] = useState('');
   const [crewExpanded, setCrewExpanded] = useState(true);
   const [innerCircleExpanded, setInnerCircleExpanded] = useState(true);
-  const [networkExpanded, setNetworkExpanded] = useState(false);
   const [activeRoleFilter, setActiveRoleFilter] = useState<string | null>(null);
 
   const [optimisticNodes, dispatchOptimistic] = useOptimistic(
     nodes,
     (current: NetworkNode[], action: OptimisticAction) => {
       if (action.type === 'remove') return current.filter((n) => n.id !== action.id);
-      if (action.type === 'toggle_preferred') {
+      if (action.type === 'toggle_star') {
         return current.map((n) =>
-          n.id === action.id ? { ...n, gravity: action.newGravity as NetworkNode['gravity'] } : n
+          n.id === action.id ? { ...n, starred: action.starred } : n
         );
       }
       return current;
@@ -196,20 +159,36 @@ export function StreamLayout({
   );
 
   // Classify into zones
-  const crewNodes = optimisticNodes.filter(isCrewNode);
-  const innerCircleNodes = optimisticNodes.filter(isInnerCircleNode);
-  const networkNodes = optimisticNodes.filter(isNetworkNode);
+  const crewNodes = optimisticNodes.filter(isRosterNode);
+  const innerCircleNodes = optimisticNodes.filter(isClientNode);
+  // Starred entities appear in a strip above the categories AND stay in their
+  // category below. A star is a shortcut, not a relocation -- moving something
+  // out of its category when you pin it is the mistake Inner Circle made.
+  const labels = categoryLabels(labelPack);
+  const starredNodes = optimisticNodes.filter((n) => n.starred);
+  const vendorNodes = optimisticNodes.filter((n) => isInCategory(n, 'vendors'));
+  const venueNodes = optimisticNodes.filter((n) => isInCategory(n, 'venues'));
+  const unsortedNodes = optimisticNodes.filter(isUnsorted);
+  // Kept for the Genesis empty-state check below — an entity in any of the
+  // three sections means the workspace is no longer empty.
+  const networkNodes = optimisticNodes.filter(isOtherNode);
 
   const showGenesis = crewNodes.length === 0 && innerCircleNodes.length === 0 && networkNodes.length === 0;
 
-  const handleTogglePreferred = (node: NetworkNode) => {
-    const isCurrentlyPreferred = node.gravity === 'inner_circle';
-    const action = isCurrentlyPreferred ? onUnpin : onPin;
-    if (!action) return;
-    const newGravity = isCurrentlyPreferred ? 'outer_orbit' : 'inner_circle';
+  /**
+   * Toggle the CURRENT user's star.
+   *
+   * This used to write `tier` on the shared relationship edge, which meant one
+   * person's shortcut changed what everyone saw -- and, because zone membership
+   * keyed off tier, changed which zone the entity appeared in. Stars are now
+   * per-user rows and affect nothing but this user's view.
+   */
+  const handleToggleStar = (node: NetworkNode) => {
+    if (!onToggleStar) return;
+    const nextStarred = !node.starred;
     startTransition(async () => {
-      dispatchOptimistic({ type: 'toggle_preferred', id: node.id, newGravity });
-      const result = await action(node.id);
+      dispatchOptimistic({ type: 'toggle_star', id: node.id, starred: nextStarred });
+      const result = await onToggleStar(node.entityId, nextStarred);
       if (result.ok) router.refresh();
     });
   };
@@ -240,18 +219,42 @@ export function StreamLayout({
   // Inner Circle zone: search
   const displayedInnerCircle = searchFilter(innerCircleNodes, innerCircleSearch);
 
-  // Network zone: filter, search, sort
-  const counts = getNetworkCounts(networkNodes);
-  const visibleFilters = FILTER_DEFS.filter((f) => f.id === 'all' || counts[f.id] > 0);
-
-  let displayedNetwork = applyFilter(networkNodes, activeFilter);
-  displayedNetwork = searchFilter(displayedNetwork, networkSearch);
-  displayedNetwork = applySort(displayedNetwork, sort);
-
   return (
     <div className={cn('relative flex w-full flex-col gap-8', showGenesis && 'flex-1 min-h-0')}>
 
-      {/* ── Zone 1: Crew (Staff + Contractors + Freelancers) ── */}
+      {/* ── Starred — this user's own shortcuts, above everything ── */}
+      {starredNodes.length > 0 && (
+        <div className="flex flex-col gap-5">
+          <div className="flex items-center gap-2">
+            <Star size={12} strokeWidth={1.5} className="text-[var(--stage-text-secondary)]" />
+            <h2 className="stage-label text-[var(--stage-text-secondary)]">Starred</h2>
+            <span className="shrink-0 rounded-full bg-[oklch(1_0_0/0.06)] px-2.5 py-0.5 stage-badge-text tabular-nums text-[var(--stage-text-secondary)]">
+              {starredNodes.length}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 gap-[var(--stage-gap)] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {starredNodes.map((node) => (
+              <div
+                key={`starred-${node.id}`}
+                className="h-full"
+                onMouseEnter={() => handleNodeHoverEnter(node)}
+                onMouseLeave={handleNodeHoverLeave}
+              >
+                {/* No layoutId here on purpose: this node also renders in its
+                    category below, and two elements sharing a layoutId make
+                    Framer Motion animate between them. */}
+                <NetworkCard
+                  node={node}
+                  onClick={() => onNodeClick?.(node)}
+                  onTogglePreferred={onToggleStar ? () => handleToggleStar(node) : undefined}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Roster — staff, contractors and freelancers (ROSTER_MEMBER / PARTNER) ── */}
       {crewNodes.length > 0 && (
         <section>
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -261,7 +264,7 @@ export function StreamLayout({
               className="flex items-center gap-2 text-left group"
             >
               <h2 className="stage-label text-[var(--stage-text-secondary)]">
-                Crew
+                {labels.roster}
               </h2>
               <span className="shrink-0 rounded-full bg-[oklch(1_0_0/0.06)] px-2.5 py-0.5 stage-badge-text tabular-nums text-[var(--stage-text-secondary)]">
                 {crewNodes.length}
@@ -391,7 +394,7 @@ export function StreamLayout({
         </section>
       )}
 
-      {/* ── Zone 2: Inner Circle (preferred companies + venues) ── */}
+      {/* ── Clients — anyone on a CLIENT edge, person or company ── */}
       {innerCircleNodes.length > 0 && (
         <>
           <section>
@@ -402,7 +405,7 @@ export function StreamLayout({
                 className="flex items-center gap-2 text-left group"
               >
                 <h2 className="stage-label text-[var(--stage-text-secondary)]">
-                  Inner Circle
+                  {labels.clients}
                 </h2>
                 <span className="shrink-0 rounded-full bg-[oklch(1_0_0/0.06)] px-2.5 py-0.5 stage-badge-text tabular-nums text-[var(--stage-text-secondary)]">
                   {innerCircleNodes.length}
@@ -455,7 +458,7 @@ export function StreamLayout({
                             node={node}
                             layoutId={`node-${node.id}`}
                             onClick={() => onNodeClick?.(node)}
-                            onTogglePreferred={(onPin || onUnpin) ? () => handleTogglePreferred(node) : undefined}
+                            onTogglePreferred={onToggleStar ? () => handleToggleStar(node) : undefined}
                           />
                         </div>
                       ))}
@@ -477,7 +480,11 @@ export function StreamLayout({
         </>
       )}
 
-      {/* ── Zone 3: Network (everyone else) or Genesis ── */}
+      {/* ── Vendors · Venues · Unsorted ──────────────────────────────────
+           Sections replace the old "Network" residual zone and its filter
+           chips: a category you can see beats one you have to filter for.
+           Unsorted is a holding pen to be emptied, so it sits last and
+           collapsed rather than reading as a fourth peer. */}
       <AnimatePresence mode="wait">
         {showGenesis ? (
           <GenesisState
@@ -488,169 +495,45 @@ export function StreamLayout({
             onOpenOmni={onOpenOmni}
             onOpenProfile={onOpenProfile}
           />
-        ) : networkNodes.length > 0 ? (
+        ) : (
           <motion.div
-            key="network-stream"
+            key="category-sections"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={STAGE_MEDIUM}
-            className="flex flex-col gap-5"
+            className="flex flex-col gap-8"
           >
-            {/* Collapsible header */}
-            {(crewNodes.length > 0 || innerCircleNodes.length > 0) && (
-              <button
-                type="button"
-                onClick={() => setNetworkExpanded((v) => !v)}
-                className="flex items-center gap-2 text-left group"
-              >
-                <h2 className="stage-label text-[var(--stage-text-secondary)]">
-                  Network
-                </h2>
-                <span className="shrink-0 rounded-full bg-[oklch(1_0_0/0.06)] px-2.5 py-0.5 stage-badge-text tabular-nums text-[var(--stage-text-secondary)]">
-                  {networkNodes.length}
-                </span>
-                <ChevronDown
-                  className={cn(
-                    'size-3.5 text-[var(--stage-text-secondary)] transition-transform duration-[120ms]',
-                    networkExpanded && 'rotate-180'
-                  )}
-                />
-              </button>
-            )}
-
-            {/* Content — shown when expanded (or when no crew/inner circle exist) */}
-            <AnimatePresence>
-              {(networkExpanded || (crewNodes.length === 0 && innerCircleNodes.length === 0)) && (
-                <motion.div
-                  key="network-content"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={STAGE_MEDIUM}
-                  className="flex flex-col gap-5 overflow-hidden"
-                >
-                  {/* Filter + Sort bar */}
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex flex-wrap gap-1.5">
-                      {visibleFilters.map((f) => (
-                        <button
-                          key={f.id}
-                          type="button"
-                          onClick={() => setActiveFilter(f.id)}
-                          className={cn(
-                            'flex items-center gap-1.5 rounded-xl px-3 py-1.5 stage-badge-text transition-colors duration-100',
-                            activeFilter === f.id
-                              ? 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)] shadow-[inset_0_0_0_1px_var(--stage-accent)/30]'
-                              : 'bg-[oklch(1_0_0/0.05)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)]'
-                          )}
-                        >
-                          {f.label}
-                          {f.id !== 'all' && (
-                            <span
-                              className={cn(
-                                'rounded-full px-1.5 py-px stage-badge-text tabular-nums',
-                                activeFilter === f.id
-                                  ? 'bg-[var(--stage-accent)]/20 text-[var(--stage-accent)]'
-                                  : 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)]'
-                              )}
-                            >
-                              {counts[f.id]}
-                            </span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="ml-auto flex items-center gap-2">
-                      {/* Search */}
-                      <div className="relative">
-                        <Search className="absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-[var(--stage-text-secondary)]/60 pointer-events-none" />
-                        <input
-                          type="text"
-                          placeholder="Filter…"
-                          aria-label="Search network"
-                          value={networkSearch}
-                          onChange={(e) => setNetworkSearch(e.target.value)}
-                          className={cn(
-                            'stage-input h-8 !pl-7 pr-3 text-xs',
-                            'focus-visible:outline-none',
-                            networkSearch ? 'w-40' : 'w-28 focus:w-40'
-                          )}
-                        />
-                      </div>
-
-                      {/* Sort toggle */}
-                      <button
-                        type="button"
-                        onClick={() => setSort((s) => (s === 'relationship' ? 'name' : 'relationship'))}
-                        title={sort === 'relationship' ? 'Sorted: default' : 'Sorted: A–Z'}
-                        className="flex h-8 items-center gap-1.5 rounded-xl border border-[var(--stage-edge-subtle)] bg-[oklch(1_0_0/0.05)] px-2.5 stage-badge-text text-[var(--stage-text-secondary)] transition-colors hover:border-[var(--stage-accent)]/30 hover:text-[var(--stage-text-primary)]"
-                      >
-                        <ArrowUpDown className="size-3" />
-                        {sort === 'relationship' ? 'Default' : 'A–Z'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Network grid */}
-                  <AnimatePresence mode="popLayout">
-                    {displayedNetwork.length > 0 ? (
-                      <motion.div
-                        key="grid"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="grid grid-cols-1 gap-[var(--stage-gap)] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
-                      >
-                        {displayedNetwork.map((node) => (
-                          <div
-                            key={node.id}
-                            className="h-full"
-                            onMouseEnter={() => handleNodeHoverEnter(node)}
-                            onMouseLeave={handleNodeHoverLeave}
-                          >
-                            <NetworkCard
-                              node={node}
-                              layoutId={`node-${node.id}`}
-                              onClick={() => onNodeClick?.(node)}
-                              onTogglePreferred={(onPin || onUnpin) ? () => handleTogglePreferred(node) : undefined}
-                            />
-                          </div>
-                        ))}
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="empty"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="flex flex-col items-center justify-center py-16 text-center"
-                      >
-                        <p className="stage-label text-[var(--stage-text-secondary)]">
-                          {networkSearch ? (
-                            <>No results for <span className="text-[var(--stage-text-primary)]">&ldquo;{networkSearch}&rdquo;</span></>
-                          ) : (
-                            'No connections yet.'
-                          )}
-                        </p>
-                        {networkSearch && (
-                          <button
-                            type="button"
-                            onClick={() => setNetworkSearch('')}
-                            className="mt-2 stage-badge-text text-[var(--stage-accent)] hover:underline"
-                          >
-                            Clear filter
-                          </button>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <CategorySection
+              title={labels.vendors}
+              nodes={vendorNodes}
+              roleLabels={roleLabels}
+              onNodeClick={onNodeClick}
+              onNodeHoverEnter={handleNodeHoverEnter}
+              onNodeHoverLeave={handleNodeHoverLeave}
+              onTogglePreferred={onToggleStar ? handleToggleStar : undefined}
+            />
+            <CategorySection
+              title={labels.venues}
+              nodes={venueNodes}
+              roleLabels={roleLabels}
+              onNodeClick={onNodeClick}
+              onNodeHoverEnter={handleNodeHoverEnter}
+              onNodeHoverLeave={handleNodeHoverLeave}
+              onTogglePreferred={onToggleStar ? handleToggleStar : undefined}
+            />
+            <CategorySection
+              title="Unsorted"
+              nodes={unsortedNodes}
+              defaultExpanded={false}
+              emptyLabel="Nothing waiting to be filed."
+              onNodeClick={onNodeClick}
+              onNodeHoverEnter={handleNodeHoverEnter}
+              onNodeHoverLeave={handleNodeHoverLeave}
+              onTogglePreferred={onToggleStar ? handleToggleStar : undefined}
+            />
           </motion.div>
-        ) : null}
+        )}
       </AnimatePresence>
     </div>
   );

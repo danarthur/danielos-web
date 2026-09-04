@@ -19,10 +19,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ChevronDown, Plus, Search } from 'lucide-react';
+import { ChevronDown, Plus, Search, SquarePen } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { addPackageToProposal } from '@/features/sales/api/proposal-actions';
+import { addPackageToProposal, addCustomItemToProposal } from '@/features/sales/api/proposal-actions';
+import { createPackage } from '@/features/sales/api/package-actions';
+import type { PackageCategory } from '@/features/sales/api/package-types';
 import {
   getCatalogPackagesWithTags,
   type PackageWithTags,
@@ -57,6 +59,12 @@ const TAG_PILL_STYLES: Record<string, { bg: string; border: string; dot: string 
 function tagPill(color: string) {
   return TAG_PILL_STYLES[color] ?? TAG_PILL_STYLES['slate-400'];
 }
+
+/** Field styling for the custom-item form. Matches the dense sidebar scale
+ *  used by the catalog search input above, not the default form density. */
+const CUSTOM_INPUT = 'stage-input w-full h-8 text-[13px]';
+const CUSTOM_CHECKBOX =
+  'h-4 w-4 rounded border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)] accent-[var(--stage-accent)]';
 
 /** Category display order + labels for the accordion. */
 const CATEGORY_ORDER: { id: string; label: string }[] = [
@@ -98,6 +106,91 @@ export function CatalogPicker({
   const [stagedIds, setStagedIds] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState<Set<string>>(new Set());
   const [recentlyAdded, setRecentlyAdded] = useState<string | null>(null);
+
+  // ── Custom line item ───────────────────────────────────────────────────
+  // Not everything sold is in the catalog. This adds a one-off row without
+  // forcing the user to create a permanent catalog entry first.
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customName, setCustomName] = useState('');
+  const [customDesc, setCustomDesc] = useState('');
+  const [customQty, setCustomQty] = useState('1');
+  const [customPrice, setCustomPrice] = useState('');
+  const [customSaving, setCustomSaving] = useState(false);
+  // Category is how the picker groups things, so it is required for a catalog
+  // save to land somewhere sensible rather than defaulting into "Packages".
+  const [customCategory, setCustomCategory] = useState<PackageCategory>('rental');
+  const [customTaxable, setCustomTaxable] = useState(true);
+  const [customSaveToCatalog, setCustomSaveToCatalog] = useState(false);
+  const [customTagIds, setCustomTagIds] = useState<Set<string>>(new Set());
+
+  const resetCustom = useCallback(() => {
+    setCustomName('');
+    setCustomDesc('');
+    setCustomQty('1');
+    setCustomPrice('');
+    setCustomCategory('rental');
+    setCustomTaxable(true);
+    setCustomSaveToCatalog(false);
+    setCustomTagIds(new Set());
+  }, []);
+
+  const handleAddCustom = useCallback(async () => {
+    if (!customName.trim() || customSaving) return;
+    setCustomSaving(true);
+
+    // Optionally promote the item to a real catalog entry first, so the
+    // proposal row carries a catalog origin and behaves like any other
+    // catalog-sourced line downstream (gear planning, crew roles, variance).
+    let originPackageId: string | null = null;
+    if (customSaveToCatalog) {
+      if (!workspaceId) {
+        setCustomSaving(false);
+        toast.error('Workspace not resolved — cannot save to catalog.');
+        return;
+      }
+      const created = await createPackage(workspaceId, {
+        name: customName.trim(),
+        description: customDesc.trim() || null,
+        category: customCategory,
+        price: Number(customPrice) || 0,
+        is_taxable: customTaxable,
+        tagIds: [...customTagIds],
+      });
+      if (!created.package) {
+        setCustomSaving(false);
+        toast.error(created.error ?? 'Could not save to catalog.');
+        return;
+      }
+      originPackageId = created.package.id;
+    }
+
+    const result = await addCustomItemToProposal(dealId, {
+      name: customName,
+      description: customDesc || null,
+      quantity: Number(customQty) || 1,
+      unitPrice: Number(customPrice) || 0,
+      isTaxable: customTaxable,
+      category: customCategory,
+      originPackageId,
+      insertAfterSortOrder: insertAfterSortOrder ?? undefined,
+    });
+    setCustomSaving(false);
+    if (!result.success) {
+      // The catalog entry may already exist at this point; say so rather than
+      // implying nothing happened.
+      toast.error(
+        originPackageId
+          ? `Saved to catalog, but adding to the proposal failed: ${result.error}`
+          : result.error,
+      );
+      return;
+    }
+    toast.success(customSaveToCatalog ? 'Item added and saved to catalog.' : 'Item added.');
+    resetCustom();
+    setCustomOpen(false);
+    onItemAdded();
+  }, [customName, customDesc, customQty, customPrice, customSaving, customCategory, customTaxable,
+      customSaveToCatalog, customTagIds, workspaceId, dealId, insertAfterSortOrder, onItemAdded, resetCustom]);
 
   // ── Initial load — catalog + tags in parallel ────────────────────────────
   useEffect(() => {
@@ -324,7 +417,188 @@ export function CatalogPicker({
             {semanticLoading ? '…' : totalMatches}
           </span>
         )}
+        <button
+          type="button"
+          onClick={() => setCustomOpen((v) => !v)}
+          aria-expanded={customOpen}
+          title="Add an item that isn't in the catalog"
+          className={cn(
+            'shrink-0 inline-flex items-center gap-1.5 h-8 px-2.5 rounded-[var(--stage-radius-input,6px)]',
+            'text-[13px] font-medium tracking-tight transition-colors',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
+            customOpen
+              ? 'bg-[var(--ctx-card)] text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.12)]'
+              : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] border border-transparent',
+          )}
+        >
+          <SquarePen size={13} strokeWidth={1.75} />
+          Custom
+        </button>
       </div>
+
+      {/* Custom line item — for anything with no catalog entry behind it.
+           Grouped identity -> commercials -> filing, so the eye lands on the
+           three decisions in the order they get made. */}
+      {customOpen && (
+        <div className="shrink-0 mx-3 mb-3 rounded-[var(--stage-radius-nested,8px)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)]">
+          <div className="flex items-center justify-between gap-2 px-3 pt-2.5 pb-2">
+            <span className="stage-label text-[var(--stage-text-secondary)]">New item</span>
+            <button
+              type="button"
+              onClick={() => { resetCustom(); setCustomOpen(false); }}
+              className="text-[11px] text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)] transition-colors"
+              aria-label="Close custom item form"
+            >
+              Cancel
+            </button>
+          </div>
+
+          {/* Identity */}
+          <div className="px-3 pb-3 space-y-2">
+            <div>
+              <label htmlFor="custom-name" className="block stage-label mb-1">Name</label>
+              <input
+                id="custom-name"
+                type="text"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                placeholder="e.g. Custom LED wall"
+                className={CUSTOM_INPUT}
+              />
+            </div>
+            <div>
+              <label htmlFor="custom-desc" className="block stage-label mb-1">
+                Description <span className="normal-case tracking-normal text-[var(--stage-text-tertiary)]">(optional)</span>
+              </label>
+              <input
+                id="custom-desc"
+                type="text"
+                value={customDesc}
+                onChange={(e) => setCustomDesc(e.target.value)}
+                placeholder="4m x 3m, ships with rigging"
+                className={CUSTOM_INPUT}
+              />
+            </div>
+          </div>
+
+          {/* Commercials */}
+          <div className="px-3 py-3 border-t border-[var(--stage-edge-subtle)] space-y-2">
+            <div className="flex items-end gap-2">
+              <div className="w-[64px] shrink-0">
+                <label htmlFor="custom-qty" className="block stage-label mb-1">Qty</label>
+                <input
+                  id="custom-qty"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={customQty}
+                  onChange={(e) => setCustomQty(e.target.value)}
+                  className={cn(CUSTOM_INPUT, 'tabular-nums')}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <label htmlFor="custom-price" className="block stage-label mb-1">Unit price</label>
+                <input
+                  id="custom-price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={customPrice}
+                  onChange={(e) => setCustomPrice(e.target.value)}
+                  placeholder="0.00"
+                  className={cn(CUSTOM_INPUT, 'tabular-nums')}
+                />
+              </div>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer w-fit">
+              <input
+                type="checkbox"
+                checked={customTaxable}
+                onChange={(e) => setCustomTaxable(e.target.checked)}
+                className={CUSTOM_CHECKBOX}
+              />
+              <span className="text-[12px] text-[var(--stage-text-secondary)]">Taxable</span>
+            </label>
+          </div>
+
+          {/* Filing — how the item is categorised, and whether it is kept. */}
+          <div className="px-3 py-3 border-t border-[var(--stage-edge-subtle)] space-y-2">
+            <div>
+              <label htmlFor="custom-category" className="block stage-label mb-1">Category</label>
+              <select
+                id="custom-category"
+                value={customCategory}
+                onChange={(e) => setCustomCategory(e.target.value as PackageCategory)}
+                className={cn(CUSTOM_INPUT, 'appearance-none cursor-pointer')}
+              >
+                {CATEGORY_ORDER.map((c) => (
+                  <option key={c.id} value={c.id}>{c.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <label className="flex items-center gap-2 cursor-pointer w-fit">
+              <input
+                type="checkbox"
+                checked={customSaveToCatalog}
+                onChange={(e) => setCustomSaveToCatalog(e.target.checked)}
+                className={CUSTOM_CHECKBOX}
+              />
+              <span className="text-[12px] text-[var(--stage-text-secondary)]">
+                Also save to catalog
+              </span>
+            </label>
+
+            {/* Tags are the workspace's own filing scheme — noise on a one-off
+                item, but the thing that makes a kept item findable later. */}
+            {customSaveToCatalog && allTags.length > 0 && (
+              <div className="pt-0.5">
+                <span className="block stage-label mb-1.5">Tags</span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {allTags.map((tag) => {
+                    const on = customTagIds.has(tag.id);
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() =>
+                          setCustomTagIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(tag.id)) next.delete(tag.id);
+                            else next.add(tag.id);
+                            return next;
+                          })
+                        }
+                        className={cn(
+                          'px-2 py-0.5 rounded-[var(--stage-radius-input,6px)] text-[11px] tracking-tight transition-colors',
+                          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
+                          on
+                            ? 'bg-[var(--ctx-card)] text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.12)]'
+                            : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] border border-transparent hover:bg-[oklch(1_0_0_/_0.05)]',
+                        )}
+                      >
+                        {tag.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="px-3 pb-3">
+            <button
+              type="button"
+              onClick={handleAddCustom}
+              disabled={!customName.trim() || customSaving}
+              className="stage-btn stage-btn-primary w-full h-8 rounded-[var(--stage-radius-input,6px)] disabled:opacity-45 disabled:pointer-events-none"
+            >
+              {customSaving ? 'Adding…' : 'Add to proposal'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Tag filter chip row — horizontal scroll */}
       <div className="shrink-0 px-3 pb-3">

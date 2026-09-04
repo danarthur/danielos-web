@@ -46,6 +46,7 @@ export {
   getProposalForEvent,
   getExpandedPackageLineItems,
   addPackageToProposal,
+  addCustomItemToProposal,
   getPackages,
   getCatalogPackages,
   deleteProposalItemsByPackageInstanceId,

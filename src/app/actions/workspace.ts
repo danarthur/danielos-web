@@ -568,6 +568,7 @@ export async function offboardTeamMember(
           .eq('source_entity_id', dirEnt.id)
           .eq('target_entity_id', orgEntityId)
           .in('relationship_type', ['ROSTER_MEMBER', 'MEMBER'])
+          .is('ended_at', null)
           .maybeSingle();
         if (relRow) {
           const ctx = (relRow.context_data as Record<string, unknown>) ?? {};

@@ -34,7 +34,7 @@ export async function linkClientToNetwork(
     p_target_entity_id: clientEntityId,
     p_type: 'CLIENT',
     p_context_data: {
-      tier: 'preferred',
+      tier: 'standard',
       lifecycle_status: 'active',
       deleted_at: null,
     },

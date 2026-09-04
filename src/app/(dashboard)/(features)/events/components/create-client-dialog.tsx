@@ -138,7 +138,7 @@ export function CreateClientDialog({
           </div>
         </SheetBody>
 
-        <div className="shrink-0 border-t border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-void)]/20 px-6 py-5">
+        <div className="shrink-0 border-t border-[var(--stage-edge-subtle)] px-6 py-5">
           <Button
             variant="silk"
             className="h-12 w-full rounded-xl"

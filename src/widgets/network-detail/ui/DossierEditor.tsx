@@ -106,6 +106,11 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
   const [brandColor, setBrandColor] = React.useState(details.orgBrandColor ?? 'oklch(0.12 0 0)');
   const [relType, setRelType] = React.useState(details.relationshipTypeRaw ?? details.direction ?? 'vendor');
   const [lifecycle, setLifecycle] = React.useState(details.lifecycleStatus ?? 'active');
+  // Preferred is a SHARED workspace judgement -- "first call, better rate" --
+  // so it lives here beside the other relationship metadata rather than as a
+  // one-click toggle on a card. A card toggle is what made it indistinguishable
+  // from a personal star; that is now a separate per-user thing.
+  const [preferred, setPreferred] = React.useState(details.relationshipTier === 'preferred');
   const [blacklistReason, setBlacklistReason] = React.useState(details.blacklistReason ?? '');
   const [tagInput, setTagInput] = React.useState('');
   const [localTags, setLocalTags] = React.useState<string[]>(tags);
@@ -162,6 +167,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
             type: (relType === 'client' ? 'client_company' : relType) as 'vendor' | 'venue' | 'client_company' | 'partner',
             lifecycleStatus: lifecycle as 'prospect' | 'active' | 'dormant' | 'blacklisted',
             blacklistReason: lifecycle === 'blacklisted' ? blacklistReason : null,
+            tier: preferred ? 'preferred' : 'standard',
             tags: mergedTags.length ? mergedTags : null,
           }),
           updateRelationshipNotes(relationshipId, (formData.get('notes') as string) || null),
@@ -193,7 +199,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
         router.refresh();
       });
     },
-    [ghostOrgId, sourceOrgId, relationshipId, brandColor, localTags, relType, lifecycle, blacklistReason]
+    [ghostOrgId, sourceOrgId, relationshipId, brandColor, localTags, relType, lifecycle, blacklistReason, preferred]
   );
 
   React.useEffect(() => {
@@ -201,6 +207,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
       setBrandColor(details.orgBrandColor ?? 'oklch(0.12 0 0)');
       setRelType(details.relationshipTypeRaw ?? details.direction ?? 'vendor');
       setLifecycle(details.lifecycleStatus ?? 'active');
+      setPreferred(details.relationshipTier === 'preferred');
       setBlacklistReason(details.blacklistReason ?? '');
       setLocalTags(details.relationshipTags ?? []);
       setEnrichmentPreview(null);
@@ -222,6 +229,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
           type: (relType === 'client' ? 'client_company' : relType) as 'vendor' | 'venue' | 'client_company' | 'partner',
           lifecycleStatus: lifecycle as 'prospect' | 'active' | 'dormant' | 'blacklisted',
           blacklistReason: lifecycle === 'blacklisted' ? blacklistReason : null,
+          tier: preferred ? 'preferred' : 'standard',
           tags: localTags.length ? localTags : null,
         }),
         updateRelationshipNotes(relationshipId!, (formData.get('notes') as string) || null),
@@ -483,6 +491,20 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 <option value="dormant">Dormant</option>
                 <option value="blacklisted">Blacklisted</option>
               </select>
+            </div>
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer w-fit">
+                <input
+                  type="checkbox"
+                  checked={preferred}
+                  onChange={(e) => setPreferred(e.target.checked)}
+                  className="h-4 w-4 rounded border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)] accent-[var(--stage-accent)]"
+                />
+                <span className="text-[13px] text-[var(--stage-text-secondary)]">Preferred</span>
+              </label>
+              <p className="mt-1 stage-label text-[var(--stage-text-tertiary)] normal-case tracking-normal">
+                Shared with your workspace. For your own shortcuts, star them instead.
+              </p>
             </div>
             <AnimatePresence>
               {lifecycle === 'blacklisted' && (

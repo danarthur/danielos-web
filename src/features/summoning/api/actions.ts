@@ -133,7 +133,7 @@ export async function createPartnerSummon(
             p_source_entity_id: originDirEnt.id,
             p_target_entity_id: sovereignOrgEnt.id,
             p_type: 'PARTNER',
-            p_context_data: { tier: 'preferred', lifecycle_status: 'active' },
+            p_context_data: { tier: 'standard', lifecycle_status: 'active' },
           });
         }
         revalidatePath('/network');
@@ -450,6 +450,7 @@ export async function finishPartnerClaim(
         .eq('source_entity_id', plannerEnt.id)
         .eq('target_entity_id', ghost.id)
         .in('relationship_type', ['PARTNER', 'VENDOR', 'CLIENT', 'VENUE_PARTNER'])
+        .is('ended_at', null)
         .maybeSingle();
 
       const existingCtx = (existingEdge?.context_data as Record<string, unknown>) ?? {};
@@ -459,7 +460,7 @@ export async function finishPartnerClaim(
         p_source_entity_id: plannerEnt.id,
         p_target_entity_id: sovereignOrgEnt.id,
         p_type: 'PARTNER',
-        p_context_data: { tier: 'preferred', lifecycle_status: 'active', notes: existingCtx.notes ?? null },
+        p_context_data: { tier: 'standard', lifecycle_status: 'active', notes: existingCtx.notes ?? null },
       });
 
       // Migrate private data (keyed by legacy_org_id for backward compat)

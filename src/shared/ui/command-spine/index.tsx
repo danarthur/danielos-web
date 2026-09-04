@@ -251,7 +251,7 @@ export function CommandSpine({ network }: CommandSpineProps = {}) {
                   <Building2 size={18} className="shrink-0 text-[var(--stage-text-secondary)] transition-colors" strokeWidth={1.5} />
                 )}
                 <span className="truncate">{org.name}</span>
-                <span className="text-[var(--stage-text-secondary)] text-xs">Add to Inner Circle</span>
+                <span className="text-[var(--stage-text-secondary)] text-xs">Add to network</span>
               </Command.Item>
             ))}
             {!networkLoading && search.trim().length >= 1 && networkOrgs.length === 0 && (

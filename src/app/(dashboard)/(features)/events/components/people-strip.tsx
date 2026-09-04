@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { User, Building2, Star, Phone, MessageSquare, Replace } from 'lucide-react';
+import { User, Building2, Star, Phone, MessageSquare, Replace, Pencil } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import type { DealHost } from '../actions/resolve-deal-hosts';
 import type { DealStakeholderDisplay } from '../actions/deal-stakeholders';
@@ -76,6 +76,8 @@ export interface PeopleStripProps {
   secondary?: SecondaryRole[];
   /** When true, no chip is clickable. */
   readOnly?: boolean;
+  /** Opens quick-edit for a host/secondary chip's entity. */
+  onEditEntity?: (entityId: string) => void;
   /**
    * Optional callback invoked when the owner clicks the star affordance on
    * a non-primary host chip. Receives the host's stakeholder_id. If omitted,
@@ -115,6 +117,7 @@ export function PeopleStrip({
   hosts,
   secondary = [],
   readOnly = false,
+  onEditEntity,
   onMakePrimary,
   onMakePoc,
   currentPocEntityId,
@@ -129,7 +132,8 @@ export function PeopleStrip({
     // for replacing the whole client. Stop bubbling at every chip action.
     event?.stopPropagation();
     if (readOnly) return;
-    router.push(`/network?selected=${encodeURIComponent(entityId)}`);
+    // /network ignores ?selected= — see deal-header-strip-stakeholder-chip.tsx.
+    router.push(`/network/entity/${encodeURIComponent(entityId)}`);
   };
 
   // Collapse duplicates. When a host is also POC/planner/bill-to, we annotate
@@ -212,6 +216,11 @@ export function PeopleStrip({
               canTogglePoc ? () => onMakePoc!(h) : undefined
             }
             isActivePoc={isActivePoc}
+            onEdit={
+              !readOnly && onEditEntity && h.entity_id
+                ? () => onEditEntity(h.entity_id)
+                : undefined
+            }
           />
         );
       })}
@@ -238,6 +247,7 @@ export function PeopleStrip({
             tone="secondary"
             onClick={id ? (e) => openNode(id, e) : undefined}
             interactive={!readOnly && id !== null}
+            onEdit={!readOnly && onEditEntity && id ? () => onEditEntity(id) : undefined}
             {...activeRoleProps}
           />
         );
@@ -260,6 +270,7 @@ function Chip({
   isActivePoc,
   onToggleDealPoc,
   isActiveDealPoc,
+  onEdit,
 }: {
   icon: typeof User;
   label: string;
@@ -286,6 +297,8 @@ function Chip({
   onToggleDealPoc?: () => void;
   /** True when this chip is the currently-active deal POC. */
   isActiveDealPoc?: boolean;
+  /** When set, renders a pencil that opens quick-edit for this person/company. */
+  onEdit?: () => void;
 }) {
   const colorClass = tone === 'primary'
     ? 'text-[var(--stage-text-primary)]'
@@ -332,6 +345,7 @@ function Chip({
     onPromoteToPrimary
     || onTogglePoc
     || onToggleDealPoc
+    || onEdit
     || isActivePrimary
     || isActivePoc
     || isActiveDealPoc;
@@ -345,6 +359,20 @@ function Chip({
   return (
     <span className={wrapperClass}>
       {chipEl}
+      {onEdit ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+          className={actionButtonClass}
+          aria-label="Edit details"
+          title="Edit details"
+        >
+          <Pencil size={11} strokeWidth={1.5} />
+        </button>
+      ) : null}
       {isActivePrimary ? (
         // Primary host: persistent filled star as a status indicator. No
         // click-to-demote — owners switch primary by clicking the star on

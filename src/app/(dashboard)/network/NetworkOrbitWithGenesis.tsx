@@ -2,20 +2,21 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, UserPlus, Wrench, User, Building2, Search, Loader2 } from 'lucide-react';
+import { Plus, UserPlus, Wrench, User, Users, Truck, Building2, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Popover, PopoverTrigger, PopoverContent } from '@/shared/ui/popover';
 import { InviteTalentDialog } from '@/features/talent-onboarding';
-import { GhostForgeSheet, summonPersonGhost } from '@/features/network-data';
+import { GhostForgeSheet, summonPersonGhost, type ConnectionRole } from '@/features/network-data';
 import { AionInput } from '@/widgets/network-detail';
 import { NetworkOrbitClient } from './NetworkOrbitClient';
 import { NetworkOrbitView } from './NetworkOrbitView';
 import { RecentlyDeletedList } from './RecentlyDeletedList';
 import type { NetworkNode } from '@/entities/network';
 import type { DeletedRelationship } from '@/features/network-data';
+import type { LabelPack } from '@/entities/network/model/label-packs';
 
 import { STAGE_HEAVY } from '@/shared/lib/motion-constants';
 
@@ -176,9 +177,9 @@ interface NetworkOrbitWithGenesisProps {
   hasIdentity?: boolean;
   hasTeam?: boolean;
   brandColor?: string | null;
-  onUnpin: (relationshipId: string) => Promise<{ ok: boolean; error?: string }>;
-  onPin: (relationshipId: string) => Promise<{ ok: boolean; error?: string }>;
   deletedRelationships?: DeletedRelationship[];
+  labelPack?: LabelPack;
+  roleLabels?: Record<string, string>;
 }
 
 /**
@@ -192,14 +193,18 @@ export function NetworkOrbitWithGenesis({
   hasIdentity = false,
   hasTeam = false,
   brandColor = null,
-  onUnpin,
-  onPin,
   deletedRelationships = [],
+  labelPack,
+  roleLabels,
 }: NetworkOrbitWithGenesisProps) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [omniOpen, setOmniOpen] = React.useState(false);
-  const [forge, setForge] = React.useState<{ isOpen: boolean; name: string }>({ isOpen: false, name: '' });
+  const [forge, setForge] = React.useState<{ isOpen: boolean; name: string; role: ConnectionRole }>({
+    isOpen: false,
+    name: '',
+    role: 'client',
+  });
 
   // Staff / Contractor dialog state
   type StaffMode = 'internal_employee' | 'external_contractor';
@@ -221,9 +226,14 @@ export function NetworkOrbitWithGenesis({
     setFreelancerOpen(true);
   };
 
-  const openConnect = () => {
+  /**
+   * Outside connections open the forge sheet with the role already chosen, so
+   * "Add → Client" adds a client rather than dropping the user into a search
+   * palette that only offered companies and venues.
+   */
+  const openConnection = (role: ConnectionRole) => {
     setMenuOpen(false);
-    setOmniOpen(true);
+    setForge({ isOpen: true, name: '', role });
   };
 
   return (
@@ -252,7 +262,7 @@ export function NetworkOrbitWithGenesis({
               onOpenChange={setOmniOpen}
               onOpenForge={(name) => {
                 setOmniOpen(false);
-                setForge({ isOpen: true, name });
+                setForge({ isOpen: true, name, role: 'client' });
               }}
             />
 
@@ -268,7 +278,7 @@ export function NetworkOrbitWithGenesis({
               </PopoverTrigger>
               <PopoverContent align="end" className="w-64 p-2">
                 <p className="px-3 pb-2 pt-1 stage-label">
-                  Add to network
+                  Your team
                 </p>
                 <AddMenuItem
                   icon={UserPlus}
@@ -282,18 +292,33 @@ export function NetworkOrbitWithGenesis({
                   description="Regular 1099, on your roster"
                   onClick={() => openStaff('external_contractor')}
                 />
-                <div className="my-2 border-t border-[var(--stage-edge-subtle)]" />
                 <AddMenuItem
                   icon={User}
                   label="Freelancer"
                   description="Occasional hire, available in crew picker"
                   onClick={openFreelancer}
                 />
+                <div className="my-2 border-t border-[var(--stage-edge-subtle)]" />
+                <p className="px-3 pb-2 pt-1 stage-label">
+                  Outside your team
+                </p>
+                <AddMenuItem
+                  icon={Users}
+                  label="Client"
+                  description="Who you work for — a person or a company"
+                  onClick={() => openConnection('client')}
+                />
+                <AddMenuItem
+                  icon={Truck}
+                  label="Vendor"
+                  description="Who you buy or rent from"
+                  onClick={() => openConnection('vendor')}
+                />
                 <AddMenuItem
                   icon={Building2}
-                  label="Company / Venue"
-                  description="Vendor, venue, or partner org"
-                  onClick={openConnect}
+                  label="Venue"
+                  description="Where shows happen"
+                  onClick={() => openConnection('venue')}
                 />
               </PopoverContent>
             </Popover>
@@ -308,9 +333,9 @@ export function NetworkOrbitWithGenesis({
       <div className="flex flex-1 min-h-0">
         <NetworkOrbitView
           nodes={nodes}
-          onUnpin={onUnpin}
-          onPin={onPin}
           sourceOrgId={currentOrgId}
+          labelPack={labelPack}
+          roleLabels={roleLabels}
           hasIdentity={hasIdentity}
           hasTeam={hasTeam}
           brandColor={brandColor}
@@ -335,11 +360,12 @@ export function NetworkOrbitWithGenesis({
         orgId={currentOrgId}
       />
 
-      {/* Company / Venue forge sheet */}
+      {/* Outside-connection forge sheet (client / vendor / venue) */}
       <GhostForgeSheet
         isOpen={forge.isOpen}
         onOpenChange={(open) => setForge((prev) => ({ ...prev, isOpen: open }))}
         initialName={forge.name}
+        initialRole={forge.role}
         sourceOrgId={currentOrgId}
         ScoutInputComponent={AionInput}
       />

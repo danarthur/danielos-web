@@ -137,6 +137,7 @@ export function NetworkDetailSheet({ nodeId, kind, details: detailsProp, onClose
     <Sheet open onOpenChange={(open) => { if (!open) handleClose(); }}>
       <SheetContent
         side="right"
+        surface="surface"
         className="w-[min(100%,37.5rem)] rounded-l-[var(--stage-radius-panel,12px)] bg-[var(--stage-surface)]"
         data-surface="surface"
       >

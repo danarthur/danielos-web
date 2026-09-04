@@ -34,6 +34,8 @@ export const PUBLIC_ROUTES = [
   '/login', '/signup', '/forgot-password', '/auth/callback',
   '/p/', '/claim', '/confirm', '/crew/', '/bridge', '/dns-help/',
   '/legal',
+  '/recover', // sovereign recovery — pre-auth by design; covers /recover/cancel via startsWith
+
   '/api/auth/passkey/authenticate', '/api/auth/recover/request',
   ...WEBHOOK_ROUTES,
 ];

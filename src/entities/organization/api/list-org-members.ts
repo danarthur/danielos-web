@@ -28,6 +28,8 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberRosterItem
     .select('id, source_entity_id, context_data, created_at')
     .eq('target_entity_id', orgEnt.id)
     .eq('relationship_type', 'ROSTER_MEMBER')
+    // Live edges only; ended ones are history.
+    .is('ended_at', null)
     .order('created_at', { ascending: false });
   if (relsError || !rels?.length) return [];
 

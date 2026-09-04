@@ -17,6 +17,7 @@ export function NetworkDetailSheetSkeleton() {
       <SheetContent
         side="right"
         ariaLabel="Loading"
+        surface="surface"
         className="w-[min(100%,37.5rem)] rounded-l-[var(--stage-radius-panel,12px)] bg-[var(--stage-surface)]"
       >
         <SheetHeader>

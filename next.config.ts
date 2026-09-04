@@ -19,6 +19,22 @@ const nextConfig: NextConfig = {
   },
   transpilePackages: ["lucide-react"],
   serverExternalPackages: ["@react-email/render", "@react-email/components", "resend"],
+  typescript: {
+    // TEMPORARY UNBLOCK — Vercel's build-time TS validation step hangs (45+ min
+    // on b917828 in May 2026; 26+ min again on PR #146 in September) while the
+    // identical `npm run build` finishes in ~8 min in GitHub CI and local
+    // `tsc --noEmit` returns clean in seconds. The hang is specific to Vercel's
+    // environment, not to the code.
+    //
+    // This does NOT drop the type gate: .github/workflows/ci.yml runs
+    // `npx tsc --noEmit` as its own step in the quality job, so a type error
+    // still fails the PR. It only stops Vercel re-running that check on deploy.
+    //
+    // Revert once the Vercel TS-step slowness is actually diagnosed -- this has
+    // been "temporary" since May, and every branch cut from main rediscovers it
+    // because the fix has never landed on main.
+    ignoreBuildErrors: true,
+  },
   experimental: {
     // isolatedDevBuild (Next.js 16 default: true) moves dev output to .next/dev/
     // but webpack's cache strategy fails to create the nested subdirectories on macOS.

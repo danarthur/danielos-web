@@ -6,6 +6,9 @@
 
 export type RelationshipType = 'vendor' | 'venue' | 'client_company' | 'partner';
 
+/** A cortex.relationships edge type as it appears on a network node. */
+export type RoleEdge = 'ROSTER_MEMBER' | 'PARTNER' | 'VENDOR' | 'CLIENT' | 'VENUE_PARTNER';
+
 /** Unified node for the Network Orbit stream (org_members + org_relationships). */
 export type NetworkNode = {
   id: string;
@@ -18,7 +21,19 @@ export type NetworkNode = {
    * client vs. freelancer" classification downstream — a person on a CLIENT
    * edge is a wedding host or individual client, not a freelancer.
    */
-  relationshipType?: 'ROSTER_MEMBER' | 'PARTNER' | 'VENDOR' | 'CLIENT' | 'VENUE_PARTNER';
+  relationshipType?: RoleEdge;
+  /**
+   * Every role edge this entity holds with the workspace, deduplicated.
+   *
+   * An entity can genuinely hold several at once -- a venue that also sub-rents
+   * you gear is VENUE_PARTNER + VENDOR; a client whose AV manager freelances for
+   * you is CLIENT + PARTNER. Nodes used to be built one-per-edge, so those
+   * entities rendered as two separate rows in two different zones.
+   *
+   * `relationshipType` remains the primary role for existing callers; `roles`
+   * is the full set and is what category membership should be derived from.
+   */
+  roles?: RoleEdge[];
   identity: {
     name: string;
     avatarUrl: string | null;
@@ -28,6 +43,18 @@ export type NetworkNode = {
   };
   /** Grouping key for the Crew zone — derived from job_title or first skill tag. Null renders under "Other". */
   roleGroup?: string | null;
+  /**
+   * Whether the CURRENT user has starred this entity. Personal and silent --
+   * colleagues do not see it, and it never affects category membership. The
+   * shared "preferred" judgement is the relationship tier, not this.
+   */
+  starred?: boolean;
+  /**
+   * Controlled craft roles from ops.crew_skills.role_tag. Multi-value because
+   * dual-role is the norm here -- the DJ who also MCs, the tech who also
+   * drives. Distinct from permission roles (ops.workspace_roles).
+   */
+  crewRoles?: string[];
   meta: {
     email?: string;
     phone?: string;

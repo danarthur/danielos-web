@@ -113,6 +113,7 @@ export async function getCurrentOrgId(): Promise<string | null> {
           .eq('source_entity_id', entity.id)
           .eq('target_entity_id', cookieOrgEntity.id)
           .in('relationship_type', ['ROSTER_MEMBER', 'MEMBER'])
+          .is('ended_at', null)
           .maybeSingle();
         if (cookieMembership) return lastOrg.trim();
       }

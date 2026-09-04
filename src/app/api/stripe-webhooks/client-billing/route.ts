@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
   // Stripe.Event.data.object is a class union from the SDK that doesn't match
   // Supabase's recursive Json type. Serialize-safe in practice (Stripe ships
   // it over the wire as JSON); cast at the insert boundary.
-  const { data: dedupRow } = await supabase
+  const { data: dedupRow, error: dedupError } = await supabase
     .schema('finance')
     .from('stripe_webhook_events')
     .insert({
@@ -79,6 +79,24 @@ export async function POST(req: NextRequest) {
     })
     .select('stripe_event_id')
     .maybeSingle();
+
+  if (dedupError) {
+    // Unique violation (23505) = genuine replay of an already-recorded event →
+    // idempotent success, ack so Stripe stops retrying. Any OTHER insert error
+    // is transient (DB blip); do NOT ack — return 500 so Stripe retries and the
+    // payment is not silently dropped into the `deduplicated` branch below.
+    if (dedupError.code === '23505') {
+      return json({ received: true, deduplicated: true });
+    }
+    Sentry.captureException(dedupError);
+    Sentry.logger.error('stripe.clientBilling.dedupInsertFailed', {
+      event_id: event.id,
+      event_type: event.type,
+      workspace_id: workspaceId,
+      error: dedupError.message,
+    });
+    return json({ error: 'Dedup insert failed' }, 500);
+  }
 
   if (!dedupRow) {
     return json({ received: true, deduplicated: true });

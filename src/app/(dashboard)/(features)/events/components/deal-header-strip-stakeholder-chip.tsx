@@ -26,6 +26,8 @@ export type StakeholderChipProps = {
     deal?: PocActionConfig;
   };
   onSwap?: () => void;
+  /** Opens the quick-edit sheet for this stakeholder's basic details. */
+  onEdit?: () => void;
 };
 
 export function StakeholderChip({
@@ -34,6 +36,7 @@ export function StakeholderChip({
   extraBadge,
   pocActions,
   onSwap,
+  onEdit,
 }: StakeholderChipProps) {
   const router = useRouter();
 
@@ -43,9 +46,11 @@ export function StakeholderChip({
   const navigateTargetId = s.entity_id ?? s.organization_id ?? null;
   const goToEntity = (e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (navigateTargetId) {
-      router.push(`/network?selected=${encodeURIComponent(navigateTargetId)}`);
-    }
+    if (!navigateTargetId) return;
+    // /network reads ?nodeId= + ?kind= and ignores ?selected=, so the old link
+    // silently dropped the user on the bare contacts page. These ids are
+    // directory entity ids, which /network/entity/[id] takes directly.
+    router.push(`/network/entity/${encodeURIComponent(navigateTargetId)}`);
   };
 
   const roleToggleButton = (
@@ -139,6 +144,16 @@ export function StakeholderChip({
           pocActions.dayOf.onToggle,
           // lucide Phone path
           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />,
+        )}
+      {onEdit &&
+        roleToggleButton(
+          'Edit details',
+          false,
+          onEdit,
+          // lucide Pencil
+          <>
+            <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
+          </>,
         )}
       {onSwap &&
         roleToggleButton(

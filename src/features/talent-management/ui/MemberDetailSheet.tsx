@@ -26,6 +26,7 @@ import {
   removeSkillFromMember,
 } from '../api/member-actions';
 import { getCrewSkillsForEntity } from '../api/crew-skill-actions';
+import { EntityRolePicker } from '@/features/network-data/ui/EntityRolePicker';
 import { listWorkspaceSkillPresets } from '../api/skill-preset-actions';
 import { RoleSelect } from '@/features/team-invite/ui/RoleSelect';
 import type { UnusonicRoleId } from '@/features/team-invite/model/role-presets';
@@ -234,6 +235,7 @@ export function MemberDetailSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
+        surface="surface"
         className={cn(
           'flex max-w-md flex-col border-l border-[var(--stage-border)]',
           'bg-[var(--stage-surface)]'
@@ -387,6 +389,9 @@ export function MemberDetailSheet({
 
               {tab === 'skills' && (
                 <div className="flex flex-col gap-4">
+                  {/* Roles are the coarse "what they are" layer; the skills
+                      below are the fine "what they can do" layer. */}
+                  <EntityRolePicker workspaceId={workspaceId} entityId={member?.entity_id ?? null} />
                   <ul className="space-y-2">
                     {crewSkills.map((s) => (
                       <li

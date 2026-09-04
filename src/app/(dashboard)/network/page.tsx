@@ -8,7 +8,8 @@ import { Suspense } from 'react';
 import { getCurrentOrgId } from '@/features/network/api/actions';
 import { PersistOrgCookie } from '@/features/network/ui/PersistOrgCookie';
 import { getOrgDetails } from '@/features/org-management/api';
-import { getNetworkStream, getDeletedRelationships, unpinFromInnerCircle, pinToInnerCircle } from '@/features/network-data';
+import { getNetworkStream, getDeletedRelationships, getWorkspaceLabelPack, listCrewRoles } from '@/features/network-data';
+import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { NetworkDetailSheetWithSuspense } from '@/widgets/network-detail';
 import { NetworkOrbitWithGenesis } from './NetworkOrbitWithGenesis';
 import { NetworkGenesisNoOrg } from './NetworkGenesisNoOrg';
@@ -65,6 +66,15 @@ async function NetworkPageInner({ searchParams }: PageProps) {
   let nodes: Awaited<ReturnType<typeof getNetworkStream>> = [];
   let org: Awaited<ReturnType<typeof getOrgDetails>> = null;
   let deletedRelationships: Awaited<ReturnType<typeof getDeletedRelationships>> = [];
+  // The workspace's display vocabulary. Presentation only -- category keys are
+  // unaffected, so filters, exports and Aion keep speaking the same language.
+  const activeWorkspaceId = await getActiveWorkspaceId();
+  const labelPack = await getWorkspaceLabelPack(activeWorkspaceId);
+  // Slug -> label for the in-category role filter. Empty until the workspace
+  // seeds a vocabulary, which correctly hides the filter entirely.
+  const roleLabels = Object.fromEntries(
+    (await listCrewRoles(activeWorkspaceId ?? '')).map((r) => [r.slug, r.label]),
+  );
   try {
     [nodes, org, deletedRelationships] = await Promise.all([
       getNetworkStream(currentOrgId),
@@ -104,9 +114,9 @@ async function NetworkPageInner({ searchParams }: PageProps) {
         hasIdentity={hasIdentity}
         hasTeam={hasTeam}
         brandColor={brandColor}
-        onUnpin={unpinFromInnerCircle}
-        onPin={pinToInnerCircle}
         deletedRelationships={deletedRelationships}
+        labelPack={labelPack}
+        roleLabels={roleLabels}
       />
       {nodeId && kind && (
         <NetworkDetailSheetWithSuspense

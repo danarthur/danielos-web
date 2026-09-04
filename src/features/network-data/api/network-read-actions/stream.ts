@@ -8,7 +8,19 @@
 import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
 import type { NetworkNode } from '@/entities/network';
-import { PERSON_ATTR, COUPLE_ATTR } from '../../model/attribute-keys';
+import { mergeNodesByEntity } from './merge-nodes';
+import { PERSON_ATTR } from '../../model/attribute-keys';
+import {
+  fetchStarredEntityIds,
+  withStars,
+  withCrewRoles,
+  readContactEmail,
+  resolveNodeLabel,
+  indexCrewSkills,
+  indexByEntity,
+  sumBy,
+  countBy,
+} from './stream-helpers';
 import { ROLE_ORDER, getCurrentEntityAndOrg } from '../network-helpers';
 
 /**
@@ -23,14 +35,14 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
   // Get org directory entity
   const { data: orgDirEnt } = await supabase
     .schema('directory').from('entities')
-    .select('id').eq('legacy_org_id', orgId).maybeSingle();
+    .select('id, owner_workspace_id').eq('legacy_org_id', orgId).maybeSingle();
   if (!orgDirEnt) return [];
 
   // Verify caller is a member of the requested org (cortex check)
   const { data: callerMembership } = await supabase
     .schema('cortex').from('relationships')
     .select('id').eq('source_entity_id', entityId).eq('target_entity_id', orgDirEnt.id)
-    .in('relationship_type', ['MEMBER', 'ROSTER_MEMBER']).maybeSingle();
+    .in('relationship_type', ['MEMBER', 'ROSTER_MEMBER']).is('ended_at', null).maybeSingle();
 
   if (!callerMembership && resolvedOrgId !== orgId) return [];
 
@@ -39,11 +51,15 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     supabase.schema('cortex').from('relationships')
       .select('id, source_entity_id, context_data, created_at')
       .eq('target_entity_id', orgDirEnt.id)
-      .eq('relationship_type', 'ROSTER_MEMBER'),
+      .eq('relationship_type', 'ROSTER_MEMBER')
+      // Live edges only; ended ones are history.
+      .is('ended_at', null),
     supabase.schema('cortex').from('relationships')
       .select('id, target_entity_id, relationship_type, context_data, created_at')
       .eq('source_entity_id', orgDirEnt.id)
-      .in('relationship_type', ['PARTNER', 'VENDOR', 'CLIENT', 'VENUE_PARTNER']),
+      .in('relationship_type', ['PARTNER', 'VENDOR', 'CLIENT', 'VENUE_PARTNER'])
+      // Live edges only; ended ones are history.
+      .is('ended_at', null),
   ]);
 
   const rosterEdges = rosterRes.data ?? [];
@@ -90,7 +106,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     // Crew skills from ops.crew_skills (source of truth)
     allPersonEntityIds.length > 0
       ? supabase.schema('ops').from('crew_skills')
-          .select('entity_id, skill_tag')
+          .select('entity_id, skill_tag, role_tag')
           .in('entity_id', allPersonEntityIds)
           .eq('workspace_id', orgId)
       : { data: [] as { entity_id: string; skill_tag: string }[] },
@@ -111,33 +127,10 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
       : { data: [] as { entity_id: string; capability: string }[] },
   ]);
 
-  // Build skills map from ops.crew_skills
-  const crewSkillsByEntityId = new Map<string, string[]>();
-  for (const row of crewSkillsRes.data ?? []) {
-    const list = crewSkillsByEntityId.get(row.entity_id) ?? [];
-    list.push(row.skill_tag);
-    crewSkillsByEntityId.set(row.entity_id, list);
-  }
-
-  // Build capabilities map from ops.entity_capabilities
-  const capabilitiesByEntityId = new Map<string, string[]>();
-  for (const row of (capabilitiesRes.data ?? []) as { entity_id: string; capability: string }[]) {
-    const list = capabilitiesByEntityId.get(row.entity_id) ?? [];
-    list.push(row.capability);
-    capabilitiesByEntityId.set(row.entity_id, list);
-  }
-
-  // Aggregate outstanding balance per entity in JS
-  const balanceMap = new Map<string, number>();
-  for (const inv of (invoicesRes.data ?? [])) {
-    balanceMap.set(inv.bill_to_entity_id, (balanceMap.get(inv.bill_to_entity_id) ?? 0) + (inv.total_amount ?? 0));
-  }
-
-  // Aggregate referral count per entity
-  const referralCountMap = new Map<string, number>();
-  for (const row of (referralCountRes.data ?? []) as { referrer_entity_id: string }[]) {
-    referralCountMap.set(row.referrer_entity_id, (referralCountMap.get(row.referrer_entity_id) ?? 0) + 1);
-  }
+  const { crewSkillsByEntityId, crewRolesByEntityId } = indexCrewSkills(crewSkillsRes.data);
+  const capabilitiesByEntityId = indexByEntity(capabilitiesRes.data, 'capability');
+  const balanceMap = sumBy(invoicesRes.data, 'bill_to_entity_id', 'total_amount');
+  const referralCountMap = countBy(referralCountRes.data, 'referrer_entity_id');
 
   const personMap = new Map((personEntRes.data ?? []).map((p) => [p.id, p]));
   const partnerEntMap = new Map((partnerEntRes.data ?? []).map((p) => [p.id, p]));
@@ -226,14 +219,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     const entityType = (partner?.type as 'person' | 'company' | 'venue' | 'couple') ?? undefined;
     const attrs = (partner?.attributes as Record<string, unknown>) ?? {};
     const relType = edge.relationship_type as NetworkNode['relationshipType'];
-    // Use COUPLE_ATTR / PERSON_ATTR constants so couple entities never ghost-read a
-    // preserved email key from a prior person → couple reclassification.
-    const email =
-      entityType === 'couple'
-        ? ((attrs[COUPLE_ATTR.partner_a_email] as string) ?? undefined)
-        : entityType === 'person'
-          ? ((attrs[PERSON_ATTR.email] as string) ?? undefined)
-          : undefined;
+    const email = readContactEmail(entityType, attrs);
     // Only persons on PARTNER / VENDOR edges act as "freelancers" with a
     // job-title-based roleGroup. CLIENT-edge persons are wedding hosts or
     // individual clients and should NOT be grouped with crew.
@@ -242,14 +228,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
       entityType === 'person' && !isClientPerson
         ? (attrs[PERSON_ATTR.job_title] as string | null) ?? null
         : null;
-    // Label: clients (couple or individual) label as 'Client'; freelancer
-    // persons fall back to job_title → 'Freelancer'; everyone else uses the
-    // cortex-type label ('Vendor' / 'Venue' / 'Partner').
-    const label = relType === 'CLIENT'
-      ? 'Client'
-      : entityType === 'person'
-        ? (personJobTitle || 'Freelancer')
-        : cortexTypeToLabel(edge.relationship_type);
+    const label = resolveNodeLabel(relType, entityType, personJobTitle, cortexTypeToLabel(edge.relationship_type));
     return {
       id: edge.id,
       entityId: edge.target_entity_id,
@@ -289,14 +268,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     const typeLabel = cortexTypeToLabel(rel.relationship_type);
     const entityType = (partnerEnt?.type as 'person' | 'company' | 'venue' | 'couple') ?? undefined;
     const attrs = (partnerEnt?.attributes as Record<string, unknown>) ?? {};
-    // Use COUPLE_ATTR / PERSON_ATTR constants so couple entities never ghost-read a
-    // preserved email key from a prior person → couple reclassification.
-    const email =
-      entityType === 'couple'
-        ? ((attrs[COUPLE_ATTR.partner_a_email] as string) ?? undefined)
-        : entityType === 'person'
-          ? ((attrs[PERSON_ATTR.email] as string) ?? undefined)
-          : undefined;
+    const email = readContactEmail(entityType, attrs);
 
     return {
       id: rel.id,
@@ -320,5 +292,18 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     };
   }).sort((a, b) => a.identity.name.localeCompare(b.identity.name));
 
-  return [...coreNodes, ...extendedTeamNodes, ...innerCircleNodes, ...outerOrbitNodes];
+  // Stars are per-user, so they are attached after the shared node set is built.
+  const starredIds = await fetchStarredEntityIds(
+    supabase,
+    (orgDirEnt as { owner_workspace_id?: string | null }).owner_workspace_id ?? null,
+  );
+
+  return withCrewRoles(crewRolesByEntityId, withStars(starredIds, mergeNodesByEntity([
+    ...coreNodes,
+    ...extendedTeamNodes,
+    ...innerCircleNodes,
+    ...outerOrbitNodes,
+  ])));
 }
+
+/** Entity ids the signed-in user has starred in this workspace. */

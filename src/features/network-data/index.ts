@@ -9,8 +9,8 @@ export type {
   NodeDetailCrewMember,
 } from './api/network-read-actions';
 export {
-  pinToInnerCircle,
-  unpinFromInnerCircle,
+  setRelationshipPreferred,
+  clearRelationshipPreferred,
   updateRelationshipNotes,
   updateRelationshipMeta,
   softDeleteGhostRelationship,
@@ -47,7 +47,7 @@ export {
   updateRosterMemberField,
 } from './api/roster-actions';
 export type { RemoveRosterMemberResult, RosterActionResult } from './api/roster-actions';
-export { GhostForgeSheet } from './ui/GhostForgeSheet';
+export { GhostForgeSheet, type ConnectionRole } from './ui/GhostForgeSheet';
 export {
   PERSON_ATTR,
   COMPANY_ATTR,
@@ -64,3 +64,24 @@ export type {
   IndividualAttrKey,
   CoupleAttrKey,
 } from './model/attribute-keys';
+
+export {
+  listStarredEntityIds,
+  starEntity,
+  unstarEntity,
+} from './api/star-actions';
+
+export {
+  getWorkspaceLabelPack,
+  setWorkspaceLabelPack,
+} from './api/label-pack-actions';
+
+export {
+  listCrewRoles,
+  seedCrewRoles,
+  createCrewRole,
+  archiveCrewRole,
+  getEntityRoles,
+  setEntityRoles,
+} from './api/crew-role-actions';
+export type { CrewRole } from './api/crew-role-actions';

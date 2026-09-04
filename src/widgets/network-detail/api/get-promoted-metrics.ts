@@ -13,6 +13,7 @@
 
 import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
+import { AFFILIATION_RELATIONSHIP_TYPES } from '@/entities/network/model/affiliation';
 
 export type PersonMetrics = {
   kind: 'person';
@@ -39,15 +40,6 @@ export type GetPromotedMetricsResult =
   | { ok: true; metrics: PromotedMetrics }
   | { ok: false; error: string };
 
-const AFFILIATION_RELATIONSHIP_TYPES = [
-  'MEMBER',
-  'ROSTER_MEMBER',
-  'PARTNER',
-  'EMPLOYEE',
-  'WORKS_FOR',
-  'EMPLOYED_AT',
-  'AGENT',
-];
 
 // Open = live deals in progress (pre-terminal).
 // Past = terminal (won = closed business, lost = dead).
@@ -176,6 +168,8 @@ async function getCompanyMetrics(
     .from('relationships')
     .select('source_entity_id, target_entity_id')
     .in('relationship_type', AFFILIATION_RELATIONSHIP_TYPES)
+    // Live affiliations only; ended edges are history (see affiliation.ts).
+    .is('ended_at', null)
     .or(`source_entity_id.eq.${entityId},target_entity_id.eq.${entityId}`);
 
   const teamIds = new Set<string>();

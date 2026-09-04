@@ -42,6 +42,7 @@ async function getCallerAndOrgDirEntity(
     .eq('source_entity_id', callerEnt.id)
     .eq('target_entity_id', orgDirEnt.id)
     .eq('relationship_type', 'ROSTER_MEMBER')
+    .is('ended_at', null)
     .maybeSingle();
 
   const callerCtx = (callerRel?.context_data as Record<string, unknown>) ?? {};

@@ -52,11 +52,15 @@ export async function summonPartner(
   if (!targetDirEntId) return { ok: false, error: 'Target organization not found.' };
 
   const cortexType = orgTypeToCortex(type);
+  // Tier is a deliberate judgement ("preferred vendor, first call"), not a side
+  // effect of creating a connection. Hardcoding 'preferred' here is what filled
+  // the Preferred badge with 18 records nobody chose -- including one called
+  // "Test Buyer". setRelationshipPreferred is the intentional path.
   const { data: relId, error: rpcErr } = await supabase.rpc('upsert_relationship', {
     p_source_entity_id: srcDirEnt.id,
     p_target_entity_id: targetDirEntId,
     p_type: cortexType,
-    p_context_data: { tier: 'preferred', lifecycle_status: 'active', deleted_at: null },
+    p_context_data: { tier: 'standard', lifecycle_status: 'active', deleted_at: null },
   });
 
   if (rpcErr) return { ok: false, error: rpcErr.message };
@@ -101,14 +105,27 @@ export async function summonPartnerAsGhost(
 }
 
 /**
- * Create a Ghost person entity by name and connect it to sourceOrg as a preferred partner.
- * Used by OmniSearch when the user wants to add an individual freelancer (not a company).
- * Creates: directory person entity (ghost) + PARTNER edge with tier='preferred'.
+ * Create a Ghost person entity by name and connect it to sourceOrg.
+ * Used by OmniSearch and the Add connection sheet for individual humans.
+ *
+ * `relType` sets the edge type, which is what routes the person in the UI:
+ *   - 'partner' (default) / 'vendor' → Crew zone (isCrewNode), the Ghost Protocol
+ *     freelancer pattern.
+ *   - 'client' → Inner Circle with a 'Client' label. isCrewNode explicitly excludes
+ *     CLIENT-edge persons and isInnerCircleNode explicitly admits them, so an
+ *     individual client (wedding host, private party host) is no longer misfiled
+ *     as a preferred freelancer.
+ *
+ * tier stays 'preferred' in every case: it controls gravity (inner circle vs outer
+ * orbit), not role, and matches how existing person-client rows are stored.
  */
 export async function summonPersonGhost(
   sourceOrgId: string,
   name: string,
-): Promise<{ ok: true; entityId: string } | { ok: false; error: string }> {
+  relType: 'vendor' | 'client' | 'partner' = 'partner',
+): Promise<
+  { ok: true; entityId: string; relationshipId: string | null } | { ok: false; error: string }
+> {
   const supabase = await createClient();
   const { orgId } = await getCurrentEntityAndOrg(supabase);
   if (!orgId || orgId !== sourceOrgId) return { ok: false, error: 'Not authorized.' };
@@ -144,17 +161,22 @@ export async function summonPersonGhost(
     .single();
   if (entErr || !ghostEnt) return { ok: false, error: entErr?.message ?? 'Failed to create profile.' };
 
-  // Create PARTNER edge from org → person with tier='preferred' (inner circle)
-  const { error: relErr } = await supabase.rpc('upsert_relationship', {
+  const { data: newRelId, error: relErr } = await supabase.rpc('upsert_relationship', {
     p_source_entity_id: srcDirEnt.id,
     p_target_entity_id: ghostEnt.id,
-    p_type: 'PARTNER',
-    p_context_data: { tier: 'preferred', lifecycle_status: 'active', deleted_at: null },
+    p_type: orgTypeToCortex(relType),
+    p_context_data: { tier: 'standard', lifecycle_status: 'active', deleted_at: null },
   });
   if (relErr) return { ok: false, error: relErr.message };
 
   revalidatePath('/network');
-  return { ok: true, entityId: ghostEnt.id };
+  // relationshipId is what /network?nodeId= resolves against for external_partner
+  // nodes -- returning the entity id there opens an empty sheet.
+  return {
+    ok: true,
+    entityId: ghostEnt.id,
+    relationshipId: typeof newRelId === 'string' ? newRelId : null,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -171,8 +193,12 @@ export type CreateGhostWithContactPayload = {
   phone?: string;
   market?: string;
   unionStatus?: string;
-  // Organization-specific
+  /**
+   * What this connection is to us. Applies to both people and organizations:
+   * a client or vendor may be an individual. 'venue' is organization-only.
+   */
   relationshipType?: 'vendor' | 'venue' | 'client' | 'partner';
+  // Organization-specific
   w9Status?: boolean;
   coiExpiry?: string;
   paymentTerms?: string;
@@ -201,21 +227,36 @@ export async function createGhostWithContact(
   if (!orgId || orgId !== sourceOrgId) return { success: false, error: 'Unauthorized.' };
 
   if (payload.type === 'person') {
-    const result = await summonPersonGhost(sourceOrgId, payload.name);
+    // Individual humans can be clients or vendors, not just freelancers. Anything
+    // other than client/vendor (including an absent value) is the crew default.
+    const personRel: 'vendor' | 'client' | 'partner' =
+      payload.relationshipType === 'client' || payload.relationshipType === 'vendor'
+        ? payload.relationshipType
+        : 'partner';
+    const result = await summonPersonGhost(sourceOrgId, payload.name, personRel);
     if (!result.ok) return { success: false, error: result.error };
     // Update person attributes if provided
-    if (payload.email || payload.phone || payload.market || payload.unionStatus) {
-      const attrs: Record<string, unknown> = {};
-      if (payload.email) attrs.email = payload.email;
-      if (payload.phone) attrs.phone = payload.phone;
-      if (payload.market) attrs.market = payload.market;
-      if (payload.unionStatus) attrs.union_status = payload.unionStatus;
+    const personPatch: Record<string, unknown> = {};
+    if (payload.email) personPatch.email = payload.email;
+    if (payload.phone) personPatch.phone = payload.phone;
+    if (payload.market) personPatch.market = payload.market;
+    if (payload.unionStatus) personPatch.union_status = payload.unionStatus;
+    // Mirror the category written by createGhostOrg so person and company
+    // clients/vendors read back identically downstream.
+    if (personRel === 'client') personPatch.category = 'client';
+    else if (personRel === 'vendor') personPatch.category = 'vendor';
+    if (Object.keys(personPatch).length > 0) {
       await supabase.rpc('patch_entity_attributes', {
         p_entity_id: result.entityId,
-        p_attributes: attrs,
+        p_attributes: personPatch,
       });
     }
-    return { success: true, relationshipId: result.entityId, organizationId: result.entityId };
+    return {
+      success: true,
+      // Fall back to the entity id only if the RPC gave us nothing.
+      relationshipId: result.relationshipId ?? result.entityId,
+      organizationId: result.entityId,
+    };
   }
 
   // Organization flow
@@ -304,7 +345,9 @@ export type ScoutResultForCreate = {
  */
 export async function createConnectionFromScout(
   sourceOrgId: string,
-  data: ScoutResultForCreate
+  data: ScoutResultForCreate,
+  /** What the scouted organization is to us. Defaults to a generic partner. */
+  relationshipType: 'vendor' | 'venue' | 'client' | 'partner' = 'partner'
 ): Promise<{ success: true; relationshipId: string } | { success: false; error: string }> {
   const supabase = await createClient();
   const { orgId } = await getCurrentEntityAndOrg(supabase);
@@ -324,12 +367,12 @@ export async function createConnectionFromScout(
     workspace_id: workspaceId,
     name,
     city: '—',
-    type: 'partner',
+    type: relationshipType === 'client' ? 'client_company' : relationshipType,
     created_by_org_id: sourceOrgId,
   });
   if (!ghost.ok) return { success: false, error: ghost.error };
 
-  const linkResult = await summonPartner(sourceOrgId, ghost.id, 'partner');
+  const linkResult = await summonPartner(sourceOrgId, ghost.id, relationshipType);
   if (!linkResult.ok) return { success: false, error: linkResult.error };
 
   const { updateGhostProfile } = await import('@/features/network-data/api/update-ghost');

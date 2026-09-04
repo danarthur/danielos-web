@@ -11,6 +11,7 @@ import { createClient } from '@/shared/api/supabase/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { PERSON_ATTR, COMPANY_ATTR, VENUE_ATTR, COUPLE_ATTR, INDIVIDUAL_ATTR } from '../../model/attribute-keys';
 import { getCurrentEntityAndOrg } from '../network-helpers';
+import { readEntityAddress } from '@/shared/lib/entity-address';
 import type { NodeDetail } from './types';
 
 /**
@@ -94,7 +95,7 @@ export async function getNetworkNodeDetails(
           .schema('cortex').from('relationships')
           .select('context_data').eq('source_entity_id', entityId)
           .eq('target_entity_id', cortexRel.target_entity_id)
-          .eq('relationship_type', 'ROSTER_MEMBER').maybeSingle();
+          .eq('relationship_type', 'ROSTER_MEMBER').is('ended_at', null).maybeSingle();
         const callerCtx = (callerRel?.context_data as Record<string, unknown>) ?? {};
         const callerRole = (callerCtx.role as string | null) ?? null;
         canAssignElevatedRole = callerRole === 'owner' || callerRole === 'admin';
@@ -399,7 +400,15 @@ export async function getNetworkNodeDetails(
     orgWebsite: (orgAttrs[COMPANY_ATTR.website] as string | null) ?? null,
     crew,
     orgSupportEmail: (orgAttrs[COMPANY_ATTR.support_email] as string | null) ?? null,
-    orgAddress: (orgAttrs[COMPANY_ATTR.address] as NodeDetail['orgAddress']) ?? null,
+    // Resolve through the shared reader rather than reading the nested object
+    // directly: venues and companies whose address is stored only as top-level
+    // keys or only as formatted_address would otherwise render blank on the
+    // contact page and in the detail sheet. See src/shared/lib/entity-address.ts.
+    orgAddress: (() => {
+      const a = readEntityAddress(orgAttrs);
+      const hasAny = a.street || a.city || a.state || a.postal_code || a.country;
+      return hasAny ? (a as NodeDetail['orgAddress']) : null;
+    })(),
     orgDefaultCurrency: (orgAttrs[COMPANY_ATTR.default_currency] as string | null) ?? null,
     orgCategory: (orgAttrs[COMPANY_ATTR.category] as string | null) ?? null,
     orgOperationalSettings: (orgAttrs[COMPANY_ATTR.operational_settings] as Record<string, unknown> | null) ?? null,

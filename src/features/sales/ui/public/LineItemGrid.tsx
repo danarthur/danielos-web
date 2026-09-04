@@ -25,6 +25,14 @@ export interface LineItemGridProps {
   sectionBgAlternate?: boolean;
   /** SVG trim divider between grouped sections. */
   sectionTrim?: TrimVariant;
+  /**
+   * Builder-only: makes each row selectable so clicking a line in the proposal
+   * opens its inspector. Omitted on the client-facing proposal, where rows stay
+   * inert -- passing nothing leaves rendering exactly as it was.
+   */
+  onItemClick?: (itemId: string) => void;
+  /** Builder-only: id of the currently selected row. */
+  selectedItemId?: string | null;
 }
 
 function formatCurrency(value: number): string {
@@ -508,6 +516,8 @@ export function LineItemGrid({
   layout = 'card',
   sectionBgAlternate = false,
   sectionTrim = 'none',
+  onItemClick,
+  selectedItemId = null,
 }: LineItemGridProps) {
   if (!items.length) return null;
 
@@ -522,14 +532,48 @@ export function LineItemGrid({
   const grouped = groupItems(displayItems);
 
   const renderItem = (item: DisplayItem, i: number) => {
-    switch (layout) {
-      case 'row':
-        return <RowItem key={item.id} item={item} i={i} disabled={disabled} onSelectionChange={onSelectionChange} />;
-      case 'minimal':
-        return <MinimalItem key={item.id} item={item} i={i} disabled={disabled} onSelectionChange={onSelectionChange} />;
-      default:
-        return <CardItem key={item.id} item={item} i={i} isSingle={isSingle} disabled={disabled} onSelectionChange={onSelectionChange} eventStartTime={eventStartTime} eventEndTime={eventEndTime} />;
-    }
+    const inner = (() => {
+      switch (layout) {
+        case 'row':
+          return <RowItem key={item.id} item={item} i={i} disabled={disabled} onSelectionChange={onSelectionChange} />;
+        case 'minimal':
+          return <MinimalItem key={item.id} item={item} i={i} disabled={disabled} onSelectionChange={onSelectionChange} />;
+        default:
+          return <CardItem key={item.id} item={item} i={i} isSingle={isSingle} disabled={disabled} onSelectionChange={onSelectionChange} eventStartTime={eventStartTime} eventEndTime={eventEndTime} />;
+      }
+    })();
+
+    if (!onItemClick) return inner;
+
+    // Selectable wrapper. The row itself keeps its own styling; selection is
+    // expressed as a ring around it so the document still reads like the
+    // proposal the client will see.
+    const selected = selectedItemId === item.id;
+    return (
+      <div
+        key={item.id}
+        role="button"
+        tabIndex={0}
+        aria-pressed={selected}
+        aria-label={`Edit ${item.name}`}
+        onClick={() => onItemClick(item.id)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onItemClick(item.id);
+          }
+        }}
+        className={cn(
+          'relative cursor-pointer rounded-[var(--portal-radius)] transition-shadow',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-accent)]',
+          selected
+            ? 'ring-2 ring-[var(--portal-accent)] ring-offset-2 ring-offset-[var(--portal-bg)]'
+            : 'hover:ring-1 hover:ring-[var(--portal-accent)]/40',
+        )}
+      >
+        {inner}
+      </div>
+    );
   };
 
   // Ungrouped — flat list or grid

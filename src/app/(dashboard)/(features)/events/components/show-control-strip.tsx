@@ -220,8 +220,10 @@ export function ShowControlStrip({
       >
         <StagePanel
           elevated
-          className="p-5 rounded-[var(--stage-radius-panel)] border border-[color-mix(in_oklch,var(--color-unusonic-error)_30%,transparent)]"
+          className="p-5 rounded-[var(--stage-radius-panel)]"
           style={{
+            border:
+              '1px solid color-mix(in oklch, var(--color-unusonic-error) 30%, transparent)',
             background:
               'color-mix(in oklch, var(--color-unusonic-error) 6%, var(--stage-surface-raised))',
           }}

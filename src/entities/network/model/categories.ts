@@ -1,0 +1,106 @@
+/**
+ * Network categories — what an entity is to the workspace.
+ *
+ * Derived from the role edges an entity holds, never from a stored column and
+ * never from the star. The three zones this replaces (Crew / Inner Circle /
+ * Network) answered three different questions -- a kind, a preference and a
+ * leftover -- so starring someone moved them between zones and unstarred
+ * clients were indistinguishable from unstarred freelancers.
+ *
+ * Membership is deliberately NOT exclusive. A venue that also sub-rents you
+ * gear belongs in Venues and Vendors; a client whose AV manager freelances for
+ * you belongs in Clients and Roster. All three of those overlaps exist in the
+ * pilot workspace today.
+ */
+
+import type { NetworkNode, RoleEdge } from './types';
+
+export type NetworkCategory = 'clients' | 'roster' | 'vendors' | 'venues';
+
+/** Fixed order. Clients lead because they are the only relationship carrying money and a clock. */
+export const CATEGORY_ORDER: NetworkCategory[] = ['clients', 'roster', 'vendors', 'venues'];
+
+/**
+ * Default labels. `roster` is the one workspaces are expected to rename
+ * (Crew / Talent / Team); clients and venues stay fixed because they are
+ * already the industry's own words.
+ */
+export const CATEGORY_LABELS: Record<NetworkCategory, string> = {
+  clients: 'Clients',
+  roster: 'Roster',
+  vendors: 'Vendors',
+  venues: 'Venues',
+};
+
+/**
+ * Which role edges place an entity in which category.
+ *
+ * PARTNER is absent on purpose: it is a catch-all written by summonPartner for
+ * anything added as a generic connection, covering both freelance people and
+ * partner companies such as planners and coordinators. Mapping it wholesale to
+ * roster put companies in a category defined as "people you put on jobs".
+ * It is resolved by entity type in categoriesOf instead.
+ */
+const ROLE_TO_CATEGORY: Partial<Record<RoleEdge, NetworkCategory>> = {
+  CLIENT: 'clients',
+  ROSTER_MEMBER: 'roster',
+  VENDOR: 'vendors',
+  VENUE_PARTNER: 'venues',
+};
+
+/**
+ * Every category this node belongs to.
+ *
+ * Falls back to `relationshipType` for nodes built before `roles` existed, and
+ * to `kind` for roster members, whose edge type is implied rather than stored
+ * on the partner edge.
+ */
+/**
+ * The role edges a node carries, tolerating nodes built before `roles` existed
+ * (they carry a single `relationshipType` instead). Shared with
+ * `mergeNodesByEntity`, which needs the identical fallback.
+ */
+export function rolesOf(node: NetworkNode): RoleEdge[] {
+  if (node.roles?.length) return node.roles;
+  if (node.relationshipType) return [node.relationshipType];
+  return [];
+}
+
+export function categoriesOf(node: NetworkNode): NetworkCategory[] {
+  const roles = rolesOf(node);
+
+  const out = new Set<NetworkCategory>();
+  for (const role of roles) {
+    if (role === 'PARTNER') {
+      // A company you partner with is a business relationship, not a person you
+      // can staff a show with. People default to roster; companies to vendors,
+      // which is closer to true than roster and avoids a fifth category.
+      out.add(node.identity.entityType === 'person' ? 'roster' : 'vendors');
+      continue;
+    }
+    const cat = ROLE_TO_CATEGORY[role];
+    if (cat) out.add(cat);
+  }
+
+  // Employees and extended team are roster by definition, even if the edge
+  // type never made it onto the node.
+  if (node.kind === 'internal_employee' || node.kind === 'extended_team') {
+    out.add('roster');
+  }
+
+  return CATEGORY_ORDER.filter((c) => out.has(c));
+}
+
+/** True when the node belongs in the given category. */
+export function isInCategory(node: NetworkNode, category: NetworkCategory): boolean {
+  return categoriesOf(node).includes(category);
+}
+
+/**
+ * Nodes holding no recognised role. These are a holding pen to be emptied, not
+ * a fifth category -- a residual bucket people can live in forever accumulates
+ * exactly the records that matter most and are hardest to find.
+ */
+export function isUnsorted(node: NetworkNode): boolean {
+  return categoriesOf(node).length === 0;
+}

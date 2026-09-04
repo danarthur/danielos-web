@@ -14,13 +14,12 @@ import { createDeal } from '@/app/(dashboard)/(features)/events/actions/deal-act
 import { updateDealStatus } from '@/app/(dashboard)/(features)/events/actions/update-deal-status';
 import { updateDealScalars } from '@/app/(dashboard)/(features)/events/actions/update-deal-scalars';
 import { getCrewDecisionData } from '@/app/(dashboard)/(features)/events/actions/get-crew-decision-data';
-import { logFollowUpAction } from '@/app/(dashboard)/(features)/events/actions/follow-up-actions';
 import { envelope } from '../../lib/retrieval-envelope';
 import { getSubstrateCounts } from '../../lib/substrate-counts';
 import { WRITE_DENIED, type AionToolContext } from './types';
 
 export function createActionTools(ctx: AionToolContext) {
-  const { workspaceId, canWrite } = ctx;
+  const { workspaceId, canWrite, userName } = ctx;
 
   // ---- Deal management ----
 
@@ -241,20 +240,22 @@ export function createActionTools(ctx: AionToolContext) {
     }),
     execute: async (params) => {
       if (!canWrite) return WRITE_DENIED;
-      try {
-        const { Resend } = await import('resend');
-        const resend = new Resend(process.env.RESEND_API_KEY);
-        const from = process.env.EMAIL_FROM ?? 'noreply@unusonic.com';
-        const { error } = await resend.emails.send({
-          from, to: params.to, subject: params.subject,
-          html: `<p>${params.body.replace(/\n/g, '<br>')}</p>`, text: params.body,
-        });
-        if (error) return { sent: false, error: error.message };
-        await logFollowUpAction(params.dealId, 'email_sent', 'email', `Sent via Aion: ${params.subject}`, params.body);
-        return { sent: true, to: params.to };
-      } catch (err) {
-        return { sent: false, error: err instanceof Error ? err.message : 'Email send failed' };
-      }
+      // Route through the canonical Aion sender: workspace-branded from
+      // (getWorkspaceFrom), React Email template (escapes the body), plain-text
+      // part, and follow-up logging — matching every other Aion-initiated
+      // email. Replaces the previous raw-Resend path (global EMAIL_FROM, no
+      // reply routing, unescaped HTML interpolation).
+      const { sendDispatchEmail } = await import('../../dispatch/lib/send-dispatch-email');
+      const result = await sendDispatchEmail({
+        to: params.to,
+        subject: params.subject,
+        body: params.body,
+        dealId: params.dealId,
+        workspaceId,
+        senderName: userName,
+      });
+      if (!result.sent) return { sent: false, error: result.error };
+      return { sent: true, to: params.to };
     },
   });
 

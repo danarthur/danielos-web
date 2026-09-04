@@ -11,14 +11,18 @@ import { createClient } from '@/shared/api/supabase/server';
 import { getCurrentEntityAndOrg, orgTypeToCortex } from './network-helpers';
 
 // ---------------------------------------------------------------------------
-// Pin / Unpin (Inner Circle)
+// Relationship tier
 // ---------------------------------------------------------------------------
 
 /**
- * Pin a relationship to the Inner Circle (tier = 'preferred').
- * Session 9: handles cortex relationship IDs (primary) with legacy org_relationships fallback.
+ * Mark a relationship as preferred (tier = 'preferred').
+ *
+ * This is a SHARED business judgement -- "preferred vendor, first call, better
+ * rate" -- visible to the whole workspace. It is not a personal shortcut: that
+ * is a star, which lives per-user in cortex.network_stars. The two used to be
+ * the same flag, which is why starring someone changed what colleagues saw.
  */
-export async function pinToInnerCircle(
+export async function setRelationshipPreferred(
   relationshipId: string
 ): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient();
@@ -47,10 +51,8 @@ export async function pinToInnerCircle(
   return { ok: false, error: 'Relationship not found.' };
 }
 
-/**
- * Unpin (Anti-Gravity): Downgrade a relationship from 'preferred' (Inner Circle) to 'standard' (Outer Orbit).
- */
-export async function unpinFromInnerCircle(
+/** Return a relationship to the standard tier. Shared, like setRelationshipPreferred. */
+export async function clearRelationshipPreferred(
   relationshipId: string
 ): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient();
