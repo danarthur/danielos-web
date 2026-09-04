@@ -95,7 +95,7 @@ export async function getNetworkNodeDetails(
           .schema('cortex').from('relationships')
           .select('context_data').eq('source_entity_id', entityId)
           .eq('target_entity_id', cortexRel.target_entity_id)
-          .eq('relationship_type', 'ROSTER_MEMBER').maybeSingle();
+          .eq('relationship_type', 'ROSTER_MEMBER').is('ended_at', null).maybeSingle();
         const callerCtx = (callerRel?.context_data as Record<string, unknown>) ?? {};
         const callerRole = (callerCtx.role as string | null) ?? null;
         canAssignElevatedRole = callerRole === 'owner' || callerRole === 'admin';

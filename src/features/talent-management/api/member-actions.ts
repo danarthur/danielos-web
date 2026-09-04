@@ -46,7 +46,7 @@ async function assertCanManageOrgMember(supabase: Awaited<ReturnType<typeof crea
   const { data: rel } = await supabase
     .schema('cortex').from('relationships')
     .select('id').eq('source_entity_id', personEnt.id).eq('target_entity_id', orgEntId)
-    .in('relationship_type', ['MEMBER', 'ROSTER_MEMBER']).maybeSingle();
+    .in('relationship_type', ['MEMBER', 'ROSTER_MEMBER']).is('ended_at', null).maybeSingle();
 
   if (!rel) return { ok: false as const, error: 'No permission to manage this org.' };
   return null;
@@ -107,6 +107,7 @@ export async function updateMemberIdentity(input: UpdateMemberIdentityInput): Pr
         .eq('source_entity_id', callerEnt.id)
         .eq('target_entity_id', rel.target_entity_id)
         .eq('relationship_type', 'ROSTER_MEMBER')
+        .is('ended_at', null)
         .maybeSingle();
       const callerCtx = (callerRel?.context_data as Record<string, unknown>) ?? {};
       const currentRole = (callerCtx.role as OrgMemberRoleDb | null) ?? null;

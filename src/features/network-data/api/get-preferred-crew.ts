@@ -42,7 +42,9 @@ export async function getPreferredCrewForPicker(
     .from('relationships')
     .select('id, source_entity_id, context_data')
     .eq('target_entity_id', orgEnt.id)
-    .eq('relationship_type', 'ROSTER_MEMBER');
+    .eq('relationship_type', 'ROSTER_MEMBER')
+    // Live edges only; ended ones are history.
+    .is('ended_at', null);
 
   if (!rosterEdges || rosterEdges.length === 0) return [];
 

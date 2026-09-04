@@ -22,6 +22,7 @@ import { createClient } from '@/shared/api/supabase/server';
 import { getModel } from '@/app/api/aion/lib/models';
 import { canExecuteAionAction } from '@/features/intelligence/lib/aion-gate';
 import { getAionConfigForWorkspace } from '@/app/(dashboard)/(features)/aion/actions/aion-config-actions';
+import { AFFILIATION_RELATIONSHIP_TYPES } from '@/entities/network/model/affiliation';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -171,13 +172,6 @@ type UpcomingEvent = {
  * to an entity like `Alexa Infranca (MEMBER of Pure Lavish Events)` instead
  * of proposing a duplicate ghost.
  */
-const AFFILIATION_RELATIONSHIP_TYPES = [
-  'MEMBER',
-  'ROSTER_MEMBER',
-  'PARTNER',
-  'WORKS_FOR',
-  'EMPLOYED_AT',
-];
 
 type RelRow = {
   source_entity_id: string;
@@ -253,6 +247,8 @@ async function fetchWorkspaceContext(
         .from('relationships')
         .select('source_entity_id, target_entity_id, relationship_type')
         .in('relationship_type', AFFILIATION_RELATIONSHIP_TYPES)
+    // Live affiliations only; ended edges are history (see affiliation.ts).
+    .is('ended_at', null)
         .or(
           `source_entity_id.in.(${ids.join(',')}),target_entity_id.in.(${ids.join(',')})`,
         );

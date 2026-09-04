@@ -19,21 +19,13 @@
 import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
 import type { CaptureVisibility } from '@/widgets/lobby-capture/api/confirm-capture';
+import { AFFILIATION_RELATIONSHIP_TYPES } from '@/entities/network/model/affiliation';
 
 /**
  * Edge types that mean "person is affiliated with this org/venue." Kept broad
  * to tolerate historical data — non-existent types (MEMBER, WORKS_FOR) just
  * match nothing.
  */
-const AFFILIATION_RELATIONSHIP_TYPES = [
-  'MEMBER',
-  'ROSTER_MEMBER',
-  'PARTNER',
-  'EMPLOYEE',
-  'WORKS_FOR',
-  'EMPLOYED_AT',
-  'AGENT',
-];
 
 export type TeamMemberPreview = {
   entityId: string;
@@ -74,6 +66,8 @@ export async function getTeamPreview(
     .from('relationships')
     .select('source_entity_id, target_entity_id, relationship_type, context_data')
     .in('relationship_type', AFFILIATION_RELATIONSHIP_TYPES)
+    // Live affiliations only; ended edges are history (see affiliation.ts).
+    .is('ended_at', null)
     .or(`source_entity_id.eq.${companyEntityId},target_entity_id.eq.${companyEntityId}`);
 
   if (edgeErr) return { ok: false, error: (edgeErr as { message: string }).message };

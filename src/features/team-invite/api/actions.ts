@@ -76,6 +76,7 @@ export async function getCurrentUserOrgRole(orgId: string): Promise<OrgMemberRol
     .eq('source_entity_id', personEnt.id)
     .eq('target_entity_id', orgEnt.id)
     .eq('relationship_type', 'ROSTER_MEMBER')
+    .is('ended_at', null)
     .maybeSingle();
 
   return ((rel?.context_data as Record<string, unknown>)?.role as OrgMemberRole) ?? null;
@@ -201,6 +202,7 @@ export async function upsertGhostMember(
       .eq('source_entity_id', myEntityId)
       .eq('target_entity_id', orgEntForAuth.id)
       .in('relationship_type', ['ROSTER_MEMBER', 'MEMBER'])
+      .is('ended_at', null)
       .maybeSingle();
     if (!authRel) return { ok: false, error: 'You do not have permission to add members to this organization.' };
 
@@ -410,6 +412,7 @@ export async function deployInvites(orgId: string, memberIds: string[]): Promise
     .eq('source_entity_id', myEntity.id)
     .eq('target_entity_id', myOrgEnt.id)
     .in('relationship_type', ['ROSTER_MEMBER', 'MEMBER'])
+    .is('ended_at', null)
     .maybeSingle();
   if (!authRel2) return { ok: false, error: 'You do not have permission to send invites for this organization.' };
 

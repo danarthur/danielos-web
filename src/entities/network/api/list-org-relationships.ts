@@ -39,7 +39,9 @@ export async function listOrgRelationships(sourceOrgId: string): Promise<OrgConn
       .from('relationships')
       .select('id, target_entity_id, relationship_type, context_data, created_at')
       .eq('source_entity_id', sourceEntity.id)
-      .in('relationship_type', ['VENDOR', 'VENUE_PARTNER', 'CLIENT', 'PARTNER']);
+      .in('relationship_type', ['VENDOR', 'VENUE_PARTNER', 'CLIENT', 'PARTNER'])
+      // Live edges only; ended ones are history.
+      .is('ended_at', null);
 
     if (cortexRels?.length) {
       const targetEntityIds = [...new Set(cortexRels.map((r) => r.target_entity_id))];

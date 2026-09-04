@@ -17,6 +17,7 @@
 import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
 import type { CaptureVisibility } from '@/widgets/lobby-capture/api/confirm-capture';
+import { AFFILIATION_RELATIONSHIP_TYPES } from '@/entities/network/model/affiliation';
 
 export type EntityCapture = {
   id: string;
@@ -92,13 +93,6 @@ function isUncertain(row: RawCaptureRow): boolean {
   return false;
 }
 
-const AFFILIATION_RELATIONSHIP_TYPES = [
-  'MEMBER',
-  'ROSTER_MEMBER',
-  'PARTNER',
-  'WORKS_FOR',
-  'EMPLOYED_AT',
-];
 
 /**
  * For company / venue entities, fetch the ids of people affiliated with them
@@ -119,6 +113,8 @@ async function resolveAffiliatedEntityIds(
     .from('relationships')
     .select('source_entity_id, target_entity_id')
     .in('relationship_type', AFFILIATION_RELATIONSHIP_TYPES)
+    // Live affiliations only; ended edges are history (see affiliation.ts).
+    .is('ended_at', null)
     .or(`source_entity_id.eq.${entityId},target_entity_id.eq.${entityId}`);
 
   const ids = new Set<string>([entityId]);

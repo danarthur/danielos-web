@@ -450,6 +450,7 @@ export async function finishPartnerClaim(
         .eq('source_entity_id', plannerEnt.id)
         .eq('target_entity_id', ghost.id)
         .in('relationship_type', ['PARTNER', 'VENDOR', 'CLIENT', 'VENUE_PARTNER'])
+        .is('ended_at', null)
         .maybeSingle();
 
       const existingCtx = (existingEdge?.context_data as Record<string, unknown>) ?? {};

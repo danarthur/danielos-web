@@ -31,7 +31,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
   const { data: callerMembership } = await supabase
     .schema('cortex').from('relationships')
     .select('id').eq('source_entity_id', entityId).eq('target_entity_id', orgDirEnt.id)
-    .in('relationship_type', ['MEMBER', 'ROSTER_MEMBER']).maybeSingle();
+    .in('relationship_type', ['MEMBER', 'ROSTER_MEMBER']).is('ended_at', null).maybeSingle();
 
   if (!callerMembership && resolvedOrgId !== orgId) return [];
 
@@ -40,11 +40,15 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     supabase.schema('cortex').from('relationships')
       .select('id, source_entity_id, context_data, created_at')
       .eq('target_entity_id', orgDirEnt.id)
-      .eq('relationship_type', 'ROSTER_MEMBER'),
+      .eq('relationship_type', 'ROSTER_MEMBER')
+      // Live edges only; ended ones are history.
+      .is('ended_at', null),
     supabase.schema('cortex').from('relationships')
       .select('id, target_entity_id, relationship_type, context_data, created_at')
       .eq('source_entity_id', orgDirEnt.id)
-      .in('relationship_type', ['PARTNER', 'VENDOR', 'CLIENT', 'VENUE_PARTNER']),
+      .in('relationship_type', ['PARTNER', 'VENDOR', 'CLIENT', 'VENUE_PARTNER'])
+      // Live edges only; ended ones are history.
+      .is('ended_at', null),
   ]);
 
   const rosterEdges = rosterRes.data ?? [];

@@ -68,7 +68,7 @@ export async function inviteTalent(
   const { data: membershipRel } = await supabase
     .schema('cortex').from('relationships')
     .select('id').eq('source_entity_id', myDirEnt.id).eq('target_entity_id', orgDirEnt.id)
-    .in('relationship_type', ['MEMBER', 'ROSTER_MEMBER']).maybeSingle();
+    .in('relationship_type', ['MEMBER', 'ROSTER_MEMBER']).is('ended_at', null).maybeSingle();
 
   if (!membershipRel) {
     return { ok: false, error: 'You do not have permission to add members to this organization.' };
@@ -113,7 +113,7 @@ export async function inviteTalent(
     const { data: existingRel } = await supabase
       .schema('cortex').from('relationships')
       .select('id').eq('source_entity_id', inviteeDirEnt.id).eq('target_entity_id', orgDirEnt.id)
-      .eq('relationship_type', 'ROSTER_MEMBER').maybeSingle();
+      .eq('relationship_type', 'ROSTER_MEMBER').is('ended_at', null).maybeSingle();
     if (existingRel) {
       return { ok: false, error: 'This person is already a member of this organization.' };
     }
@@ -193,7 +193,7 @@ export async function inviteTalent(
   const { data: existingGhostRel } = await supabase
     .schema('cortex').from('relationships')
     .select('id').eq('source_entity_id', ghostDirEnt.id).eq('target_entity_id', orgDirEnt.id)
-    .eq('relationship_type', 'ROSTER_MEMBER').maybeSingle();
+    .eq('relationship_type', 'ROSTER_MEMBER').is('ended_at', null).maybeSingle();
   if (existingGhostRel) {
     return { ok: false, error: 'This person is already in this organization.' };
   }

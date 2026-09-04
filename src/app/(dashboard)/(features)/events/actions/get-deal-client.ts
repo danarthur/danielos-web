@@ -248,6 +248,7 @@ export async function getDealClientContext(
         .eq('source_entity_id', srcDirEnt.id)
         .eq('target_entity_id', resolvedOrgDirData.id)
         .in('relationship_type', ['VENDOR', 'PARTNER', 'CLIENT', 'VENUE_PARTNER'])
+        .is('ended_at', null)
         .maybeSingle();
       relId = (cortexRel as { id?: string } | null)?.id ?? null;
     }

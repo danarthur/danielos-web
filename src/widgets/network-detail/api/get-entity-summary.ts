@@ -25,6 +25,7 @@ import { z } from 'zod';
 import { createClient } from '@/shared/api/supabase/server';
 import { getModel } from '@/app/api/aion/lib/models';
 import type { CaptureVisibility } from '@/widgets/lobby-capture/api/confirm-capture';
+import { AFFILIATION_RELATIONSHIP_TYPES } from '@/entities/network/model/affiliation';
 
 export type EntitySummary = {
   narrative: string;
@@ -80,15 +81,6 @@ function formatFallbackNarrative(entity: EntityRow | null): string {
   return `No captures on ${name} yet. Leave a voice note to start building context.`;
 }
 
-const AFFILIATION_RELATIONSHIP_TYPES = [
-  'MEMBER',
-  'ROSTER_MEMBER',
-  'PARTNER',
-  'EMPLOYEE',
-  'WORKS_FOR',
-  'EMPLOYED_AT',
-  'AGENT',
-];
 
 /**
  * For company / venue entities, resolve affiliated person ids so the summary
@@ -107,6 +99,8 @@ async function resolveSummaryScopeIds(
     .from('relationships')
     .select('source_entity_id, target_entity_id')
     .in('relationship_type', AFFILIATION_RELATIONSHIP_TYPES)
+    // Live affiliations only; ended edges are history (see affiliation.ts).
+    .is('ended_at', null)
     .or(`source_entity_id.eq.${entityId},target_entity_id.eq.${entityId}`);
   const ids = new Set<string>([entityId]);
   for (const r of ((data ?? []) as { source_entity_id: string; target_entity_id: string }[])) {

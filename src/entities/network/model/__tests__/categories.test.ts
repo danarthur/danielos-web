@@ -28,16 +28,39 @@ describe('categoriesOf', () => {
     expect(categoriesOf(node({ roles: ['VENDOR'] }))).toEqual(['vendors']);
     expect(categoriesOf(node({ roles: ['VENUE_PARTNER'] }))).toEqual(['venues']);
     expect(categoriesOf(node({ roles: ['ROSTER_MEMBER'] }))).toEqual(['roster']);
-    expect(categoriesOf(node({ roles: ['PARTNER'] }))).toEqual(['roster']);
+    // PARTNER resolves by entity type, so state it: see the dedicated cases below.
+    expect(categoriesOf(node({
+      roles: ['PARTNER'],
+      identity: { name: 'x', avatarUrl: null, label: '', entityType: 'person' },
+    }))).toEqual(['roster']);
+  });
+
+  it('sends a PARTNER company to vendors, not roster', () => {
+    // Regression: PARTNER is a catch-all written by summonPartner for both
+    // freelance people and partner companies. Mapping it wholesale to roster
+    // put companies like "Pure Lavish Events" in a category defined as people
+    // you put on jobs.
+    expect(categoriesOf(node({ roles: ['PARTNER'], identity: { name: 'Pure Lavish Events', avatarUrl: null, label: '', entityType: 'company' } })))
+      .toEqual(['vendors']);
+    expect(categoriesOf(node({ roles: ['PARTNER'], identity: { name: 'A Venue', avatarUrl: null, label: '', entityType: 'venue' } })))
+      .toEqual(['vendors']);
+  });
+
+  it('keeps a PARTNER person in roster', () => {
+    expect(categoriesOf(node({ roles: ['PARTNER'], identity: { name: 'A Freelancer', avatarUrl: null, label: '', entityType: 'person' } })))
+      .toEqual(['roster']);
   });
 
   it('puts a multi-role entity in every category it belongs to', () => {
     // "1909" in the live workspace — a venue that also sub-rents gear.
     expect(categoriesOf(node({ roles: ['VENUE_PARTNER', 'VENDOR'] })))
       .toEqual(['vendors', 'venues']);
-    // Alex Barnhart — a client who is also a partner.
-    expect(categoriesOf(node({ roles: ['CLIENT', 'PARTNER'] })))
-      .toEqual(['clients', 'roster']);
+    // Alex Barnhart — a client who is also a partner. He is a person, so the
+    // PARTNER edge resolves to roster.
+    expect(categoriesOf(node({
+      roles: ['CLIENT', 'PARTNER'],
+      identity: { name: 'Alex Barnhart', avatarUrl: null, label: '', entityType: 'person' },
+    }))).toEqual(['clients', 'roster']);
   });
 
   it('returns categories in the fixed order regardless of role order', () => {
@@ -62,6 +85,10 @@ describe('categoriesOf', () => {
     expect(categoriesOf(node({ relationshipType: 'CLIENT' }))).toEqual(['clients']);
   });
 
+  it('defaults an unknown-type PARTNER to vendors rather than asserting personhood', () => {
+    expect(categoriesOf(node({ roles: ['PARTNER'] }))).toEqual(['vendors']);
+  });
+
   it('reports nodes with no recognised role as unsorted, not as a category', () => {
     const orphan = node({ roles: [] });
     expect(categoriesOf(orphan)).toEqual([]);
@@ -70,7 +97,10 @@ describe('categoriesOf', () => {
   });
 
   it('isInCategory matches every category a node holds', () => {
-    const n = node({ roles: ['CLIENT', 'PARTNER'] });
+    const n = node({
+      roles: ['CLIENT', 'PARTNER'],
+      identity: { name: 'x', avatarUrl: null, label: '', entityType: 'person' },
+    });
     expect(isInCategory(n, 'clients')).toBe(true);
     expect(isInCategory(n, 'roster')).toBe(true);
     expect(isInCategory(n, 'vendors')).toBe(false);

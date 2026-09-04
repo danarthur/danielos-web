@@ -92,6 +92,7 @@ export async function getOrgMemberByProfileAndOrg(
       .eq('source_entity_id', personRes.data.id)
       .eq('target_entity_id', orgEntRes.data.id)
       .eq('relationship_type', 'ROSTER_MEMBER')
+      .is('ended_at', null)
       .maybeSingle();
 
     if (rel) {

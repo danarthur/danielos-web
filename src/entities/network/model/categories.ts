@@ -32,11 +32,18 @@ export const CATEGORY_LABELS: Record<NetworkCategory, string> = {
   venues: 'Venues',
 };
 
-/** Which role edges place an entity in which category. */
-const ROLE_TO_CATEGORY: Record<RoleEdge, NetworkCategory> = {
+/**
+ * Which role edges place an entity in which category.
+ *
+ * PARTNER is absent on purpose: it is a catch-all written by summonPartner for
+ * anything added as a generic connection, covering both freelance people and
+ * partner companies such as planners and coordinators. Mapping it wholesale to
+ * roster put companies in a category defined as "people you put on jobs".
+ * It is resolved by entity type in categoriesOf instead.
+ */
+const ROLE_TO_CATEGORY: Partial<Record<RoleEdge, NetworkCategory>> = {
   CLIENT: 'clients',
   ROSTER_MEMBER: 'roster',
-  PARTNER: 'roster',
   VENDOR: 'vendors',
   VENUE_PARTNER: 'venues',
 };
@@ -57,6 +64,13 @@ export function categoriesOf(node: NetworkNode): NetworkCategory[] {
 
   const out = new Set<NetworkCategory>();
   for (const role of roles) {
+    if (role === 'PARTNER') {
+      // A company you partner with is a business relationship, not a person you
+      // can staff a show with. People default to roster; companies to vendors,
+      // which is closer to true than roster and avoids a fifth category.
+      out.add(node.identity.entityType === 'person' ? 'roster' : 'vendors');
+      continue;
+    }
     const cat = ROLE_TO_CATEGORY[role];
     if (cat) out.add(cat);
   }

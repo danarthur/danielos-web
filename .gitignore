@@ -67,3 +67,4 @@ docs/
 # Supabase CLI local state + raw schema dumps (captured baselines live in migrations/)
 supabase/.temp/
 supabase/schemas/
+.env*.local
