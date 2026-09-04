@@ -4,28 +4,42 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
 import { PERSON_ATTR } from '../model/attribute-keys';
+import { getCallerWorkspaceRole } from '@/entities/organization/api/caller-workspace-role';
 
-// ─── Auth helper (mirrors pattern from actions.ts) ────────────────────────────
+// ─── Auth helper ─────────────────────────────────────────────────────────────
 
-async function getCallerAndOrgDirEntity(
+/**
+ * Gate roster management on workspace membership.
+ *
+ * This used to read `context_data.role` off the caller's ROSTER_MEMBER edge,
+ * which locked the actual workspace owner out of their own roster. An owner's
+ * entity carries a MEMBER edge, not ROSTER_MEMBER, so the lookup found nothing,
+ * the role read as empty, and every roster mutation returned "Only owners and
+ * admins can manage roster members." On the pilot workspace that meant NOBODY
+ * could archive, remove, or edit a roster member: the only record holding
+ * role='admin' was an unclaimed ghost that no one can sign in as.
+ *
+ * The authority for permissions is `public.workspace_members.role`. A
+ * relationship edge is a fact about the graph, not an authorization -- it is
+ * written by ghost/invite flows that never intended to grant anything, and it
+ * silently diverges from the real membership row.
+ *
+ * The caller's own directory entity is deliberately NOT required. Managing the
+ * roster is an administrative act; needing a contact-card of your own to
+ * perform it is what made a legitimate workspace member fail with
+ * "Account not linked".
+ */
+async function requireRosterAdmin(
   supabase: Awaited<ReturnType<typeof createClient>>,
   sourceOrgId: string
 ): Promise<
-  | { ok: true; callerEntityId: string; orgDirEntityId: string; callerRole: string }
+  | { ok: true; orgDirEntityId: string; callerRole: string }
   | { ok: false; error: string }
 > {
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: 'Not signed in.' };
-
-  const { data: callerEnt } = await supabase
-    .schema('directory')
-    .from('entities')
-    .select('id')
-    .eq('claimed_by_user_id', user.id)
-    .maybeSingle();
-  if (!callerEnt) return { ok: false, error: 'Account not linked.' };
 
   const { data: orgDirEnt } = await supabase
     .schema('directory')
@@ -35,29 +49,13 @@ async function getCallerAndOrgDirEntity(
     .maybeSingle();
   if (!orgDirEnt) return { ok: false, error: 'Organization not found.' };
 
-  const { data: callerRel } = await supabase
-    .schema('cortex')
-    .from('relationships')
-    .select('context_data')
-    .eq('source_entity_id', callerEnt.id)
-    .eq('target_entity_id', orgDirEnt.id)
-    .eq('relationship_type', 'ROSTER_MEMBER')
-    .is('ended_at', null)
-    .maybeSingle();
-
-  const callerCtx = (callerRel?.context_data as Record<string, unknown>) ?? {};
-  const callerRole = (callerCtx.role as string | null) ?? '';
-
-  if (!callerRole || !['owner', 'admin'].includes(callerRole)) {
+  const callerRole =
+    (await getCallerWorkspaceRole(supabase, { legacyOrgId: sourceOrgId })) ?? '';
+  if (!['owner', 'admin'].includes(callerRole)) {
     return { ok: false, error: 'Only owners and admins can manage roster members.' };
   }
 
-  return {
-    ok: true,
-    callerEntityId: callerEnt.id,
-    orgDirEntityId: orgDirEnt.id,
-    callerRole,
-  };
+  return { ok: true, orgDirEntityId: orgDirEnt.id, callerRole };
 }
 
 // ─── Return types ─────────────────────────────────────────────────────────────
@@ -87,7 +85,7 @@ export async function removeRosterMember(
 ): Promise<RemoveRosterMemberResult> {
   const supabase = await createClient();
 
-  const auth = await getCallerAndOrgDirEntity(supabase, sourceOrgId);
+  const auth = await requireRosterAdmin(supabase, sourceOrgId);
   if (!auth.ok) return { ok: false, error: auth.error };
 
   // Look up the edge
@@ -155,7 +153,7 @@ export async function archiveRosterMember(
 ): Promise<RosterActionResult> {
   const supabase = await createClient();
 
-  const auth = await getCallerAndOrgDirEntity(supabase, sourceOrgId);
+  const auth = await requireRosterAdmin(supabase, sourceOrgId);
   if (!auth.ok) return { ok: false, error: auth.error };
 
   const { data: edge } = await supabase
@@ -198,7 +196,7 @@ export async function setDoNotRebook(
 ): Promise<RosterActionResult> {
   const supabase = await createClient();
 
-  const auth = await getCallerAndOrgDirEntity(supabase, sourceOrgId);
+  const auth = await requireRosterAdmin(supabase, sourceOrgId);
   if (!auth.ok) return { ok: false, error: auth.error };
 
   const { data: edge } = await supabase
@@ -244,7 +242,7 @@ export async function updateRosterMemberField(
 ): Promise<RosterActionResult> {
   const supabase = await createClient();
 
-  const auth = await getCallerAndOrgDirEntity(supabase, sourceOrgId);
+  const auth = await requireRosterAdmin(supabase, sourceOrgId);
   if (!auth.ok) return { ok: false, error: auth.error };
 
   const { data: edge } = await supabase
