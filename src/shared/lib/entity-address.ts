@@ -35,7 +35,9 @@ export const EMPTY_ADDRESS: EntityAddress = {
 };
 
 function str(v: unknown): string {
-  return typeof v === 'string' ? v.trim() : typeof v === 'number' ? String(v) : '';
+  if (typeof v === 'string') return v.trim();
+  if (typeof v === 'number') return String(v);
+  return '';
 }
 
 /**

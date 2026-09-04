@@ -55,12 +55,19 @@ const ROLE_TO_CATEGORY: Partial<Record<RoleEdge, NetworkCategory>> = {
  * to `kind` for roster members, whose edge type is implied rather than stored
  * on the partner edge.
  */
+/**
+ * The role edges a node carries, tolerating nodes built before `roles` existed
+ * (they carry a single `relationshipType` instead). Shared with
+ * `mergeNodesByEntity`, which needs the identical fallback.
+ */
+export function rolesOf(node: NetworkNode): RoleEdge[] {
+  if (node.roles?.length) return node.roles;
+  if (node.relationshipType) return [node.relationshipType];
+  return [];
+}
+
 export function categoriesOf(node: NetworkNode): NetworkCategory[] {
-  const roles: RoleEdge[] = node.roles?.length
-    ? node.roles
-    : node.relationshipType
-      ? [node.relationshipType]
-      : [];
+  const roles = rolesOf(node);
 
   const out = new Set<NetworkCategory>();
   for (const role of roles) {

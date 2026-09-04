@@ -54,20 +54,12 @@ export function CategorySection({
 
   if (nodes.length === 0) return null;
 
-  // Role filtering only earns its place once a category is too long to scan.
-  // Below the threshold the whole list is visible and role chips are noise --
-  // which is how a small workspace stays flat and a large one gets structure
-  // without either having to configure anything.
-  const rolesPresent = roleLabels
-    ? [...new Set(nodes.flatMap((n) => n.crewRoles ?? []))].filter((r) => roleLabels[r])
-    : [];
-  const showRoles = nodes.length >= ROLE_GROUPING_THRESHOLD && rolesPresent.length > 1;
-  const activeRole = showRoles ? role : null;
-
-  const q = search.trim().toLowerCase();
-  let shown = q ? nodes.filter((n) => n.identity.name.toLowerCase().includes(q)) : nodes;
-  // A person holding two roles matches under both -- never filed under one.
-  if (activeRole) shown = shown.filter((n) => (n.crewRoles ?? []).includes(activeRole));
+  const { rolesPresent, showRoles, activeRole, shown } = resolveVisibleNodes(
+    nodes,
+    roleLabels,
+    search,
+    role,
+  );
 
   return (
     <div className="flex flex-col gap-5">
@@ -110,29 +102,12 @@ export function CategorySection({
       </div>
 
       {showRoles && expanded && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {[null, ...rolesPresent].map((r) => {
-            const on = activeRole === r;
-            const label = r === null ? 'All' : (roleLabels?.[r] ?? r);
-            return (
-              <button
-                key={r ?? '__all'}
-                type="button"
-                aria-pressed={on}
-                onClick={() => setRole(r)}
-                className={cn(
-                  'rounded-[var(--stage-radius-input,6px)] px-2 py-0.5 text-[11px] tracking-tight transition-colors',
-                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
-                  on
-                    ? 'bg-[var(--ctx-card)] text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.12)]'
-                    : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] border border-transparent hover:bg-[oklch(1_0_0_/_0.05)]',
-                )}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+        <RoleChipRow
+          rolesPresent={rolesPresent}
+          activeRole={activeRole}
+          roleLabels={roleLabels}
+          onSelect={setRole}
+        />
       )}
 
       <AnimatePresence initial={false}>
@@ -145,47 +120,150 @@ export function CategorySection({
             transition={STAGE_MEDIUM}
             className="overflow-hidden"
           >
-            {shown.length > 0 ? (
-              <div className="grid grid-cols-1 gap-[var(--stage-gap)] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                {shown.map((node) => (
-                  <div
-                    key={node.id}
-                    className="h-full"
-                    onMouseEnter={() => onNodeHoverEnter?.(node)}
-                    onMouseLeave={onNodeHoverLeave}
-                  >
-                    <NetworkCard
-                      node={node}
-                      layoutId={`node-${node.id}`}
-                      onClick={() => onNodeClick?.(node)}
-                      onTogglePreferred={onTogglePreferred ? () => onTogglePreferred(node) : undefined}
-                    />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <p className="stage-label text-[var(--stage-text-secondary)]">
-                  {search ? (
-                    <>No results for <span className="text-[var(--stage-text-primary)]">&ldquo;{search}&rdquo;</span></>
-                  ) : (
-                    emptyLabel
-                  )}
-                </p>
-                {search && (
-                  <button
-                    type="button"
-                    onClick={() => setSearch('')}
-                    className="mt-2 stage-badge-text text-[var(--stage-accent)] hover:underline"
-                  >
-                    Clear filter
-                  </button>
-                )}
-              </div>
-            )}
+            <CategoryBody
+              shown={shown}
+              search={search}
+              emptyLabel={emptyLabel}
+              onClearSearch={() => setSearch('')}
+              onNodeClick={onNodeClick}
+              onNodeHoverEnter={onNodeHoverEnter}
+              onNodeHoverLeave={onNodeHoverLeave}
+              onTogglePreferred={onTogglePreferred}
+            />
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/**
+ * Which nodes to render, and whether the role chips have earned their place.
+ *
+ * Role filtering only appears once a category is too long to scan. Below the
+ * threshold the whole list is visible and the chips are noise -- which is how a
+ * small workspace stays flat and a large one gains structure without either
+ * having to configure anything.
+ */
+function resolveVisibleNodes(
+  nodes: NetworkNode[],
+  roleLabels: Record<string, string> | undefined,
+  search: string,
+  role: string | null,
+) {
+  const rolesPresent = roleLabels
+    ? [...new Set(nodes.flatMap((n) => n.crewRoles ?? []))].filter((r) => roleLabels[r])
+    : [];
+  const showRoles = nodes.length >= ROLE_GROUPING_THRESHOLD && rolesPresent.length > 1;
+  const activeRole = showRoles ? role : null;
+
+  const q = search.trim().toLowerCase();
+  let shown = q ? nodes.filter((n) => n.identity.name.toLowerCase().includes(q)) : nodes;
+  // A person holding two roles matches under both -- never filed under one.
+  if (activeRole) shown = shown.filter((n) => (n.crewRoles ?? []).includes(activeRole));
+
+  return { rolesPresent, showRoles, activeRole, shown };
+}
+
+/** Role filter chips. Extracted so CategorySection stays under the complexity cap. */
+function RoleChipRow({
+  rolesPresent,
+  activeRole,
+  roleLabels,
+  onSelect,
+}: {
+  rolesPresent: string[];
+  activeRole: string | null;
+  roleLabels: Record<string, string> | undefined;
+  onSelect: (r: string | null) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {[null, ...rolesPresent].map((r) => {
+        const on = activeRole === r;
+        const label = r === null ? 'All' : (roleLabels?.[r] ?? r);
+        return (
+          <button
+            key={r ?? '__all'}
+            type="button"
+            aria-pressed={on}
+            onClick={() => onSelect(r)}
+            className={cn(
+              'rounded-[var(--stage-radius-input,6px)] px-2 py-0.5 text-[11px] tracking-tight transition-colors',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
+              on
+                ? 'bg-[var(--ctx-card)] text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.12)]'
+                : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] border border-transparent hover:bg-[oklch(1_0_0_/_0.05)]',
+            )}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Card grid or empty state. Extracted to keep CategorySection under the cap. */
+function CategoryBody({
+  shown,
+  search,
+  emptyLabel,
+  onClearSearch,
+  onNodeClick,
+  onNodeHoverEnter,
+  onNodeHoverLeave,
+  onTogglePreferred,
+}: {
+  shown: NetworkNode[];
+  search: string;
+  emptyLabel: string;
+  onClearSearch: () => void;
+  onNodeClick?: (n: NetworkNode) => void;
+  onNodeHoverEnter?: (n: NetworkNode) => void;
+  onNodeHoverLeave?: () => void;
+  onTogglePreferred?: (n: NetworkNode) => void;
+}) {
+  if (shown.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <p className="stage-label text-[var(--stage-text-secondary)]">
+          {search ? (
+            <>No results for <span className="text-[var(--stage-text-primary)]">&ldquo;{search}&rdquo;</span></>
+          ) : (
+            emptyLabel
+          )}
+        </p>
+        {search && (
+          <button
+            type="button"
+            onClick={onClearSearch}
+            className="mt-2 stage-badge-text text-[var(--stage-accent)] hover:underline"
+          >
+            Clear filter
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-[var(--stage-gap)] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+      {shown.map((node) => (
+        <div
+          key={node.id}
+          className="h-full"
+          onMouseEnter={() => onNodeHoverEnter?.(node)}
+          onMouseLeave={onNodeHoverLeave}
+        >
+          <NetworkCard
+            node={node}
+            layoutId={`node-${node.id}`}
+            onClick={() => onNodeClick?.(node)}
+            onTogglePreferred={onTogglePreferred ? () => onTogglePreferred(node) : undefined}
+          />
+        </div>
+      ))}
     </div>
   );
 }

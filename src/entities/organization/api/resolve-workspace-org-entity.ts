@@ -25,7 +25,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  */
 export async function resolveWorkspaceOrgEntityId(
   // The three clients differ structurally; only .schema().from() is used here.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts any of the three Supabase clients; only .schema().from() is used.
   supabase: SupabaseClient<any, any, any>,
   workspaceId: string,
 ): Promise<string | null> {

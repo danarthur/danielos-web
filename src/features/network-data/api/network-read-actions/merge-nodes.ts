@@ -7,6 +7,7 @@
  */
 
 import type { NetworkNode } from '@/entities/network';
+import { rolesOf } from '@/entities/network/model/categories';
 
 /** Most-specific-wins ordering when one entity holds several kinds of edge. */
 const KIND_RANK: Record<NetworkNode['kind'], number> = {
@@ -39,11 +40,7 @@ export function mergeNodesByEntity(nodes: NetworkNode[]): NetworkNode[] {
   for (const node of nodes) {
     const key = node.entityId;
     const existing = byEntity.get(key);
-    const ownRoles: NetworkNode['roles'] = node.roles?.length
-      ? node.roles
-      : node.relationshipType
-        ? [node.relationshipType]
-        : [];
+    const ownRoles: NetworkNode['roles'] = rolesOf(node);
 
     if (!existing) {
       byEntity.set(key, { ...node, roles: [...ownRoles] });

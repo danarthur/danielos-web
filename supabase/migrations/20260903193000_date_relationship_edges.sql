@@ -60,7 +60,10 @@ DO $do$
 DECLARE r record; n int := 0;
 BEGIN
   FOR r IN
-    SELECT p.oid, pg_get_functiondef(p.oid) AS def
+    SELECT p.oid,
+           pg_get_functiondef(p.oid) AS def,
+           quote_ident(ns.nspname) || '.' || quote_ident(p.proname)
+             || '(' || pg_get_function_identity_arguments(p.oid) || ')' AS sig
     FROM pg_proc p JOIN pg_namespace ns ON ns.oid = p.pronamespace
     WHERE p.prokind = 'f'
       AND ns.nspname NOT IN ('pg_catalog','information_schema')
@@ -71,6 +74,16 @@ BEGIN
       r.def,
       'ON CONFLICT (source_entity_id, target_entity_id, relationship_type)',
       'ON CONFLICT (source_entity_id, target_entity_id, relationship_type) WHERE ended_at IS NULL');
+
+    -- Pin the ACL rather than assume it. CREATE OR REPLACE keeps whatever
+    -- privileges a function already had -- which on prod is the correct
+    -- authenticated+service_role set, but on a FRESH database is proacl = NULL,
+    -- i.e. the PUBLIC default, i.e. anon can execute. Eight of these were in
+    -- that state: prod had been revoked out of band and no migration ever
+    -- recorded it, so prod and a fresh DB had silently diverged. Setting the
+    -- grants here converges them and is a no-op on prod.
+    EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon', r.sig);
+    EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO authenticated, service_role', r.sig);
     n := n + 1;
   END LOOP;
   RAISE NOTICE 'date_relationship_edges: rewrote % ON CONFLICT sites', n;

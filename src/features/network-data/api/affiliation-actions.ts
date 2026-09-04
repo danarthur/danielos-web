@@ -70,14 +70,17 @@ export async function moveAffiliation(input: {
 
   if (error) return { ok: false, error: error.message };
 
+  revalidatePath('/network');
+  return normalizeMoveResult(data);
+}
+
+/** Shape the RPC's jsonb payload into the action's result type. */
+function normalizeMoveResult(data: unknown): MoveAffiliationResult {
   const r = (data ?? {}) as {
     ended?: number;
     roster_edges_left?: number;
     new_edge_id?: string | null;
   };
-
-  revalidatePath('/network');
-
   return {
     ok: true,
     ended: r.ended ?? 0,

@@ -129,9 +129,8 @@ export function GhostForgeSheet({
   // The backend still speaks organization/person; role + shape derive it. Role
   // wins: a venue is always a company and crew is always a person, so a stale
   // `shape` from a previously selected role can never leak through.
-  const type: 'organization' | 'person' = showShapeChoice
-    ? (shape === 'person' ? 'person' : 'organization')
-    : (DEFAULT_SHAPE[role] === 'person' ? 'person' : 'organization');
+  const chosenShape = showShapeChoice ? shape : DEFAULT_SHAPE[role];
+  const type: 'organization' | 'person' = chosenShape === 'person' ? 'person' : 'organization';
   const isVenue = role === 'venue';
   // W-9 and COI are things we collect from parties we pay, not parties who pay us.
   const showCompliance = type === 'organization' && role !== 'client';

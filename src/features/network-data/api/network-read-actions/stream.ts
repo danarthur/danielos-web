@@ -352,7 +352,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
 
 /** Entity ids the signed-in user has starred in this workspace. */
 async function fetchStarredEntityIds(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cross-schema row shape is resolved at runtime; narrowing here would duplicate the generated types.
   supabase: any,
   workspaceId: string | null,
 ): Promise<Set<string>> {

@@ -3,16 +3,12 @@
 import { useState, useTransition, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Users, Package, AlertTriangle, ArrowLeftRight, Search, Check, Loader2 } from 'lucide-react';
+import { X, Users, Package, ArrowLeftRight, Search, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { STAGE_HEAVY, STAGE_MEDIUM, STAGE_LIGHT, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
-import { cn } from '@/shared/lib/utils';
 import {
   getDayResourceView,
   type DayResourceView,
-  type DayEventSlice,
-  type DayCrewSlot,
-  type CrossEventConflict,
 } from '../actions/get-day-resource-view';
 import {
   searchAvailableAlternatives,
@@ -42,10 +38,6 @@ function eventColor(index: number, opacity = 0.75): string {
   return `oklch(0.65 0.14 ${hue} / ${opacity})`;
 }
 
-function eventBg(index: number): string {
-  const hue = EVENT_HUES[index % EVENT_HUES.length];
-  return `oklch(0.65 0.14 ${hue} / 0.08)`;
-}
 
 // =============================================================================
 // Date formatting
@@ -570,7 +562,7 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                   </div>
 
                   <ul className="divide-y" style={{ borderColor: 'var(--stage-edge-subtle)' }}>
-                    {gearList.map((item, idx) => {
+                    {gearList.map((item) => {
                       const isConflict = conflictGearNames.has(item.name.toLowerCase().trim());
 
                       return (
