@@ -1,5 +1,7 @@
 'use client';
 
+import * as React from 'react';
+
 import { motion } from 'framer-motion';
 import { Building2, User, Star, MapPin } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
@@ -10,6 +12,12 @@ import type { NetworkNode } from '../model/types';
 interface NetworkCardProps {
   node: NetworkNode;
   onClick?: () => void;
+  /**
+   * Open one of the people listed under a company. Without it the names render
+   * as plain text, which is what they were at first -- visible but unreachable,
+   * so a planner with real deal history could be read on a card and not opened.
+   */
+  onAffiliateClick?: (entityId: string) => void;
   onTogglePreferred?: (relationshipId: string) => void;
   className?: string;
   layoutId?: string;
@@ -37,7 +45,7 @@ const COMPLETENESS_LABEL: Record<CrewCompletenessLevel, string | null> = {
 };
 
 /** Core (employee): matte elevated. Partner: standard surface. Preferred (inner_circle): silk star marker. */
-export function NetworkCard({ node, onClick, onTogglePreferred, className, layoutId }: NetworkCardProps) {
+export function NetworkCard({ node, onClick, onAffiliateClick, onTogglePreferred, className, layoutId }: NetworkCardProps) {
   // Freelancer persons (external_partner + person + inner_circle) render as
   // crew, not partners. CLIENT-edge persons (wedding hosts, individual
   // clients) are NOT freelancers — they must render in the Network/clients
@@ -228,7 +236,27 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
             */}
             {node.affiliates && node.affiliates.length > 0 && (
               <p className="mt-1 truncate stage-label text-[var(--stage-text-secondary)]">
-                {node.affiliates.slice(0, 2).map((a) => a.name).join(', ')}
+                {node.affiliates.slice(0, 2).map((a, i) => (
+                  <React.Fragment key={a.entityId}>
+                    {i > 0 && ', '}
+                    {onAffiliateClick ? (
+                      <button
+                        type="button"
+                        // The card itself is role="button"; without stopPropagation
+                        // this would open the company instead of the person.
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAffiliateClick(a.entityId);
+                        }}
+                        className="underline decoration-[var(--stage-text-tertiary)] underline-offset-2 hover:text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded-sm"
+                      >
+                        {a.name}
+                      </button>
+                    ) : (
+                      a.name
+                    )}
+                  </React.Fragment>
+                ))}
                 {node.affiliates.length > 2 && ` +${node.affiliates.length - 2}`}
               </p>
             )}

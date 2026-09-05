@@ -32,6 +32,8 @@ export interface CategorySectionProps {
   /** Role slug -> label, for the role filter. Empty disables role filtering. */
   roleLabels?: Record<string, string>;
   onNodeClick?: (node: NetworkNode) => void;
+  /** Open a person listed under a company card. See NetworkCard.onAffiliateClick. */
+  onAffiliateClick?: (entityId: string) => void;
   onNodeHoverEnter?: (node: NetworkNode) => void;
   onNodeHoverLeave?: () => void;
   onTogglePreferred?: (node: NetworkNode) => void;
@@ -44,6 +46,7 @@ export function CategorySection({
   defaultExpanded = true,
   roleLabels,
   onNodeClick,
+  onAffiliateClick,
   onNodeHoverEnter,
   onNodeHoverLeave,
   onTogglePreferred,
@@ -122,6 +125,7 @@ export function CategorySection({
           >
             <CategoryBody
               shown={shown}
+              onAffiliateClick={onAffiliateClick}
               search={search}
               emptyLabel={emptyLabel}
               onClearSearch={() => setSearch('')}
@@ -211,6 +215,7 @@ function CategoryBody({
   emptyLabel,
   onClearSearch,
   onNodeClick,
+  onAffiliateClick,
   onNodeHoverEnter,
   onNodeHoverLeave,
   onTogglePreferred,
@@ -220,6 +225,7 @@ function CategoryBody({
   emptyLabel: string;
   onClearSearch: () => void;
   onNodeClick?: (n: NetworkNode) => void;
+  onAffiliateClick?: (entityId: string) => void;
   onNodeHoverEnter?: (n: NetworkNode) => void;
   onNodeHoverLeave?: () => void;
   onTogglePreferred?: (n: NetworkNode) => void;
@@ -260,6 +266,7 @@ function CategoryBody({
             node={node}
             layoutId={`node-${node.id}`}
             onClick={() => onNodeClick?.(node)}
+            onAffiliateClick={onAffiliateClick}
             onTogglePreferred={onTogglePreferred ? () => onTogglePreferred(node) : undefined}
           />
         </div>

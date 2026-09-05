@@ -120,6 +120,14 @@ export function StreamLayout({
 }: StreamLayoutProps) {
   const router = useRouter();
 
+  // Affiliated people often have no direct edge to the workspace, so they are
+  // not nodes in this stream and cannot be opened as one. Route to the entity
+  // page instead -- the same destination TeamCard uses from a company sheet.
+  const openAffiliate = useCallback(
+    (entityId: string) => router.push(`/network/entity/${entityId}`),
+    [router],
+  );
+
   // Hover prefetch with intent delay — fires onNodeHover only after the
   // pointer has rested on a card for 150ms. Cancels if the pointer leaves
   // before the timer fires, so accidental fly-overs don't trigger fetches.
@@ -246,6 +254,7 @@ export function StreamLayout({
                 <NetworkCard
                   node={node}
                   onClick={() => onNodeClick?.(node)}
+                  onAffiliateClick={openAffiliate}
                   onTogglePreferred={onToggleStar ? () => handleToggleStar(node) : undefined}
                 />
               </div>
@@ -371,6 +380,7 @@ export function StreamLayout({
                                 node={node}
                                 layoutId={`node-${node.id}`}
                                 onClick={() => onNodeClick?.(node)}
+                  onAffiliateClick={openAffiliate}
                               />
                             </div>
                           ))}
@@ -458,6 +468,7 @@ export function StreamLayout({
                             node={node}
                             layoutId={`node-${node.id}`}
                             onClick={() => onNodeClick?.(node)}
+                  onAffiliateClick={openAffiliate}
                             onTogglePreferred={onToggleStar ? () => handleToggleStar(node) : undefined}
                           />
                         </div>
@@ -509,6 +520,7 @@ export function StreamLayout({
               nodes={vendorNodes}
               roleLabels={roleLabels}
               onNodeClick={onNodeClick}
+              onAffiliateClick={openAffiliate}
               onNodeHoverEnter={handleNodeHoverEnter}
               onNodeHoverLeave={handleNodeHoverLeave}
               onTogglePreferred={onToggleStar ? handleToggleStar : undefined}
@@ -518,6 +530,7 @@ export function StreamLayout({
               nodes={venueNodes}
               roleLabels={roleLabels}
               onNodeClick={onNodeClick}
+              onAffiliateClick={openAffiliate}
               onNodeHoverEnter={handleNodeHoverEnter}
               onNodeHoverLeave={handleNodeHoverLeave}
               onTogglePreferred={onToggleStar ? handleToggleStar : undefined}
@@ -528,6 +541,7 @@ export function StreamLayout({
               defaultExpanded={false}
               emptyLabel="Nothing waiting to be filed."
               onNodeClick={onNodeClick}
+              onAffiliateClick={openAffiliate}
               onNodeHoverEnter={handleNodeHoverEnter}
               onNodeHoverLeave={handleNodeHoverLeave}
               onTogglePreferred={onToggleStar ? handleToggleStar : undefined}
