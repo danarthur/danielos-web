@@ -21,6 +21,7 @@ import {
   sumBy,
   countBy,
   attachAffiliations,
+  fetchWorkedWithNodes,
 } from './stream-helpers';
 import { ROLE_ORDER, getCurrentEntityAndOrg } from '../network-helpers';
 
@@ -299,12 +300,24 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     (orgDirEnt as { owner_workspace_id?: string | null }).owner_workspace_id ?? null,
   );
 
-  const merged = withCrewRoles(crewRolesByEntityId, withStars(starredIds, mergeNodesByEntity([
+  const edgeNodes = [
     ...coreNodes,
     ...extendedTeamNodes,
     ...innerCircleNodes,
     ...outerOrbitNodes,
-  ])));
+  ];
+
+  // People with real deal history whom nobody filed with an edge. Added after
+  // the edge-built set so an explicit relationship always wins over an inferred
+  // one, and so nobody appears twice.
+  const workedWith = await fetchWorkedWithNodes(
+    supabase,
+    (orgDirEnt as { owner_workspace_id?: string | null }).owner_workspace_id ?? null,
+    new Set(edgeNodes.map((n) => n.entityId)),
+  );
+
+  const merged = withCrewRoles(crewRolesByEntityId, withStars(starredIds,
+    mergeNodesByEntity([...edgeNodes, ...workedWith])));
 
   // Last, so it sees the final merged node set and can attach an employer to a
   // person node and the matching people to the company node in one pass.
