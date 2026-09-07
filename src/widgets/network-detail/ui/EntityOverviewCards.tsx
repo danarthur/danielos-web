@@ -8,14 +8,22 @@
  *   • NetworkDetailSheet (right-side slide-over, tabbed — density: sheet)
  *   • Entity studio page (/network/entity/[id], full page — density: page)
  *
- * Renders (conditional on entity type):
- *   • PromotedMetricsRow — two inline metrics
- *   • EntitySummaryCard  — AI Brief
- *   • EmploymentCard     — person/couple only
- *   • WorkingNotesCard   — person/couple only
- *   • TeamCard           — company/venue only
- *   • CaptureTimelinePanel — all types
- *   • PersonProductionsPanel — person/couple only
+ * Grouped into three named zones rather than a flat stack of cards. The stack
+ * had grown to seven siblings of equal visual weight, several of them
+ * summarising the one below, so every question cost the same scan:
+ *
+ *   Who they are              Brief · Employment · Venue specs · Team
+ *   What we've done together  Productions · Referrals
+ *   What we know              Working notes · Capture timeline
+ *
+ * The order follows the moment the sheet is actually opened — an unfamiliar
+ * number calls and you have about three seconds to work out who this is, what
+ * you have done together, and whether they were any good. Judgement and its
+ * sources go last: the Brief is the glance, the timeline is where you go when
+ * the glance is not enough.
+ *
+ * Cards hide themselves when empty, and a Zone hides with its contents, so a
+ * sparse entity shows fewer headings rather than empty ones.
  *
  * Design: docs/reference/network-page-ia-redesign.md §3.2, §4, §5.
  */
@@ -66,7 +74,7 @@ export function EntityOverviewCards({
     <div
       className={cn(
         'flex flex-col',
-        density === 'page' ? 'gap-4' : 'space-y-5',
+        density === 'page' ? 'gap-6' : 'gap-7',
         className,
       )}
     >
@@ -77,42 +85,73 @@ export function EntityOverviewCards({
           entityType={entityType}
         />
       )}
-      <EntitySummaryCard
-        workspaceId={workspaceId}
-        entityId={entityId}
-        entityType={entityType}
-      />
-      {/* Venue specs: read-only summary of capacity/load-in/power/stage/etc.
-          Sits above the team card so the building-first info lands first. */}
-      {isVenue && (
-        <VenueSpecsCompactCard workspaceId={workspaceId} entityId={entityId} />
-      )}
-      {/* Employment sits above working notes: "who do they work for" is the
-          first thing you need when a name you half-recognise calls. */}
-      {isPersonOrCouple && (
-        <EmploymentCard workspaceId={workspaceId} entityId={entityId} />
-      )}
-      {isPersonOrCouple && (
-        <WorkingNotesCard workspaceId={workspaceId} entityId={entityId} />
-      )}
-      {isCompanyOrVenue && (
-        <TeamCard workspaceId={workspaceId} entityId={entityId} />
-      )}
-      <CaptureTimelinePanel
-        workspaceId={workspaceId}
-        entityId={entityId}
-        entityName={entityName}
-        entityType={entityType}
-      />
-      {isPersonOrCouple && (
-        <PersonProductionsPanel
+
+      {/*
+        Ordered around the moment this sheet actually gets opened: an unfamiliar
+        number calls, and in about three seconds you need who is this, what have
+        we done together, and are they any good. Seven equal-weight cards made
+        every one of those questions cost the same scan; three named groups let
+        you jump.
+      */}
+      <Zone label="Who they are">
+        <EntitySummaryCard
           workspaceId={workspaceId}
           entityId={entityId}
+          entityType={entityType}
         />
-      )}
-      {/* Referrals: both people and company/venue carry a reciprocity ledger
-          ("who feeds us, who do we feed"). Useful at both levels. */}
-      <ReferralsCard workspaceId={workspaceId} entityId={entityId} />
+        {isPersonOrCouple && (
+          <EmploymentCard workspaceId={workspaceId} entityId={entityId} />
+        )}
+        {/* Building-first for a venue: capacity and load-in before people. */}
+        {isVenue && (
+          <VenueSpecsCompactCard workspaceId={workspaceId} entityId={entityId} />
+        )}
+        {/* A company IS its people -- the faces are the identity, not a roster. */}
+        {isCompanyOrVenue && (
+          <TeamCard workspaceId={workspaceId} entityId={entityId} />
+        )}
+      </Zone>
+
+      <Zone label="What we've done together">
+        {isPersonOrCouple && (
+          <PersonProductionsPanel workspaceId={workspaceId} entityId={entityId} />
+        )}
+        {/* Reciprocity runs at both levels: who feeds us, who we feed. */}
+        <ReferralsCard workspaceId={workspaceId} entityId={entityId} />
+      </Zone>
+
+      {/*
+        Judgement and its sources, last. The brief above is the glance; these are
+        where you go when the glance is not enough.
+      */}
+      <Zone label="What we know">
+        {isPersonOrCouple && (
+          <WorkingNotesCard workspaceId={workspaceId} entityId={entityId} />
+        )}
+        <CaptureTimelinePanel
+          workspaceId={workspaceId}
+          entityId={entityId}
+          entityName={entityName}
+          entityType={entityType}
+        />
+      </Zone>
     </div>
+  );
+}
+
+/**
+ * A titled group of cards.
+ *
+ * Every card in here hides itself when it has nothing to show, which would
+ * otherwise leave a heading floating above nothing. `:has()` on the body means
+ * the group disappears with its contents rather than needing each card to
+ * report emptiness upward.
+ */
+function Zone({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <section className="flex flex-col gap-3 [&:not(:has(>div>*))]:hidden">
+      <h2 className="stage-label text-[var(--stage-text-tertiary)]">{label}</h2>
+      <div className="flex flex-col gap-4">{children}</div>
+    </section>
   );
 }
