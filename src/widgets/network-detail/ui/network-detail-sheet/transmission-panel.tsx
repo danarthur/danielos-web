@@ -220,8 +220,14 @@ export function TransmissionPanel({
         />
       )}
 
-      {/* ── Partner: Deal history card ── */}
-      {isPartner && details.subjectEntityId && (
+      {/* ── Partner: Deal history ──
+          Companies and venues only. A person's deals are covered in richer form
+          by PersonProductionsPanel inside EntityOverviewCards below (In play /
+          Booked / Past, with deep links), and rendering both put two deal
+          sections on one sheet. */}
+      {isPartner && details.subjectEntityId
+        && details.entityDirectoryType !== 'person'
+        && details.entityDirectoryType !== 'couple' && (
         <DealHistoryPanel entityId={details.subjectEntityId} />
       )}
 
@@ -250,8 +256,13 @@ export function TransmissionPanel({
         />
       </div>
 
-      {/* ── Active shows card ── */}
-      {details.active_events.length > 0 && (
+      {/* ── Active shows ──
+          Same reason: for a person this repeats the "Booked" band of
+          PersonProductionsPanel. Kept for companies and venues, which have no
+          productions panel of their own. */}
+      {details.active_events.length > 0
+        && details.entityDirectoryType !== 'person'
+        && details.entityDirectoryType !== 'couple' && (
         <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">
           <h3 className="stage-label text-[var(--stage-text-secondary)] mb-2">
             Active shows

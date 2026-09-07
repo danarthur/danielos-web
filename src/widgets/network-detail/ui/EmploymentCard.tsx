@@ -18,6 +18,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Building2, ArrowRight, Search, X, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import Link from 'next/link';
 import { cn } from '@/shared/lib/utils';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import {
@@ -178,8 +179,13 @@ function CurrentEmployers({ stints, showEmpty }: { stints: EmploymentStint[]; sh
     <>
       {stints.map((s) => (
         <div key={`${s.companyId}-current`} className="flex flex-col gap-0.5">
-          <p className="truncate text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)]">
-            {s.companyName}
+          <p className="truncate text-[length:var(--stage-data-size)]">
+            <Link
+              href={`/network/entity/${s.companyId}`}
+              className="text-[var(--stage-text-primary)] underline decoration-[var(--stage-text-tertiary)] underline-offset-2 hover:decoration-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded-sm"
+            >
+              {s.companyName}
+            </Link>
           </p>
           <p className="stage-label text-[var(--stage-text-secondary)]">
             {[s.jobTitle, stintRange(s)].filter(Boolean).join(' · ') || 'Current'}
@@ -199,7 +205,12 @@ function FormerEmployers({ stints }: { stints: EmploymentStint[] }) {
       {stints.map((s) => (
         <div key={`${s.companyId}-${s.endedAt}`} className="flex items-baseline justify-between gap-3">
           <span className="truncate stage-label text-[var(--stage-text-secondary)]">
-            {s.companyName}
+            <Link
+              href={`/network/entity/${s.companyId}`}
+              className="underline decoration-[var(--stage-text-tertiary)] underline-offset-2 hover:text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded-sm"
+            >
+              {s.companyName}
+            </Link>
             {s.jobTitle && <span className="text-[var(--stage-text-tertiary)]"> · {s.jobTitle}</span>}
           </span>
           {stintRange(s) && (

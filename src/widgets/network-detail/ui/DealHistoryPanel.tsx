@@ -36,6 +36,14 @@ function DealRow({ deal }: { deal: EntityDeal }) {
         <span className="stage-badge-text px-2 py-0.5 rounded-full bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-secondary)] inline-block mt-1">
           {stageBadgeLabel(deal.status)}
         </span>
+        {/* Reached this company through one of its people. Said out loud rather
+            than folded into the company's own count -- the provenance is the
+            useful part when you are working out who actually brought the job. */}
+        {deal.viaPersonName && (
+          <span className="ml-1.5 stage-badge-text text-[var(--stage-text-tertiary)]">
+            via {deal.viaPersonName}
+          </span>
+        )}
       </div>
       {deal.budget_estimated != null && (
         <span className="shrink-0 text-[length:var(--stage-data-size)] font-mono tabular-nums text-[var(--stage-text-secondary)]">

@@ -189,6 +189,12 @@ export function CaptureTimelinePanel({
     });
   }, [queryClient, workspaceId, entityId]);
 
+  // Nothing captured and nothing loading: stay out of the way. Every other card
+  // in this stack hides when empty, and leaving this one visible put a third
+  // notes-shaped box on a sheet that already had working notes and private
+  // notes -- three empty prompts reading as three different things to fill in.
+  if (!isLoading && captures.length === 0) return null;
+
   if (isLoading && captures.length === 0) {
     return (
       <div

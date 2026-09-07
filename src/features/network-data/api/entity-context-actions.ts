@@ -12,49 +12,86 @@ export type EntityDeal = {
   event_archetype: string | null;
   status: string;
   budget_estimated: number | null;
+  /**
+   * Set when this deal reaches the entity through one of its PEOPLE rather than
+   * the company itself — "Brandi Jane Events, via Brandi Jane". Labelled rather
+   * than merged, for the same reason referral credit keeps the two apart: they
+   * are two views of overlapping events and adding them double-counts.
+   */
+  viaPersonName?: string;
 };
 
 /**
- * Returns deals where this entity is a stakeholder.
- * Queries via ops.deal_stakeholders.entity_id — never via deals.organization_id
- * (legacy column under active migration).
+ * Deals connected to an entity, by every route that actually connects them.
  *
- * Two-step: ops.deal_stakeholders (schema='ops') → public.deals.
- * Cross-schema PostgREST joins are fragile; explicit two-step is safer.
- * RLS on deal_stakeholders chains through deals.workspace_id → get_my_workspace_ids().
+ * This used to query ONLY `deal_stakeholders.entity_id`, which is the person
+ * column. Companies are stored in `organization_id`, so a company reliably
+ * returned nothing: Brandi Jane Events showed no deals at all while carrying one
+ * as organization_id and two more through Brandi herself.
+ *
+ * Three routes now:
+ *   1. stakeholder by entity_id      the person
+ *   2. stakeholder by organization_id the company on the row
+ *   3. deals.organization_id          the company as the deal's client
+ *
+ * Plus, for a company, deals reached through its current people — returned with
+ * `viaPersonName` set so the provenance stays visible instead of being silently
+ * merged into the company's own count.
+ *
+ * Two-step throughout: ops.deal_stakeholders → public.deals. Cross-schema
+ * PostgREST joins are fragile; explicit two-step is safer. RLS on
+ * deal_stakeholders chains through deals.workspace_id → get_my_workspace_ids().
  */
 export async function getEntityDeals(entityId: string): Promise<EntityDeal[]> {
   const supabase = await createClient();
 
-  // Step 1: get deal IDs for this entity (workspace-scoped via RLS on ops.deal_stakeholders)
-  const { data: stakeRows, error: stakeErr } = await supabase
-    .schema('ops')
-    .from('deal_stakeholders')
-    .select('deal_id')
-    .eq('entity_id', entityId)
-    .limit(10);
+  const [directRes, clientRes, affiliateRes] = await Promise.all([
+    supabase.schema('ops').from('deal_stakeholders')
+      .select('deal_id')
+      .or(`entity_id.eq.${entityId},organization_id.eq.${entityId}`)
+      .limit(50),
+    supabase.from('deals').select('id').eq('organization_id', entityId).limit(50),
+    // Current people at this company. Empty for a person, which is what makes
+    // the through-the-team pass a no-op for them.
+    supabase.schema('cortex').from('relationships')
+      .select('source_entity_id')
+      .eq('target_entity_id', entityId)
+      .is('ended_at', null)
+      .in('relationship_type', [
+        'MEMBER', 'EMPLOYEE', 'WORKS_FOR', 'EMPLOYED_AT', 'PARTNER', 'ROSTER_MEMBER',
+      ]),
+  ]);
 
-  if (stakeErr) {
-    console.error('[network] getEntityDeals (stakeholders):', stakeErr.message);
-    return [];
-  }
+  const directIds = new Set<string>([
+    ...((directRes.data ?? []) as { deal_id: string | null }[])
+      .map((r) => r.deal_id).filter((x): x is string => Boolean(x)),
+    ...((clientRes.data ?? []) as { id: string }[]).map((r) => r.id),
+  ]);
 
-  const dealIds = (stakeRows ?? []).map((r) => r.deal_id).filter(Boolean) as string[];
-  if (dealIds.length === 0) return [];
+  const personIds = ((affiliateRes.data ?? []) as { source_entity_id: string }[])
+    .map((r) => r.source_entity_id)
+    .filter((id) => id !== entityId);
 
-  // Step 2: fetch the deals (workspace-scoped via RLS on public.deals)
+  const viaPersonByDeal = await resolveDealsViaTeam(supabase, personIds, directIds);
+
+  const allIds = [...new Set([...directIds, ...viaPersonByDeal.keys()])];
+  if (allIds.length === 0) return [];
+
   const { data, error } = await supabase
     .from('deals')
     .select('id, proposed_date, event_archetype, status, budget_estimated')
-    .in('id', dealIds)
+    .in('id', allIds)
     .order('proposed_date', { ascending: false });
 
   if (error) {
-    console.error('[network] getEntityDeals (deals):', error.message);
+    console.error('[network] getEntityDeals:', error.message);
     return [];
   }
 
-  return (data ?? []) as EntityDeal[];
+  return ((data ?? []) as EntityDeal[]).map((d) => {
+    const via = viaPersonByDeal.get(d.id);
+    return via ? { ...d, viaPersonName: via } : d;
+  });
 }
 
 // ─── Financial summary ────────────────────────────────────────────────────────
@@ -127,4 +164,37 @@ export async function updateVenueTechnicalSpecs(
 
   if (error) return { ok: false, error: error.message };
   return { ok: true };
+}
+
+/**
+ * Deals reached through a company's people, mapped to the person who brought
+ * them. A deal the company is already on directly is its own, not "through"
+ * anyone, so those are skipped rather than relabelled.
+ */
+async function resolveDealsViaTeam(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the server client's generics vary; only .schema()/.from() are used.
+  supabase: any,
+  personIds: string[],
+  directIds: Set<string>,
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (personIds.length === 0) return out;
+
+  const [teamRes, peopleRes] = await Promise.all([
+    supabase.schema('ops').from('deal_stakeholders')
+      .select('deal_id, entity_id').in('entity_id', personIds).limit(50),
+    supabase.schema('directory').from('entities')
+      .select('id, display_name').in('id', personIds),
+  ]);
+
+  const nameById = new Map(
+    ((peopleRes.data ?? []) as { id: string; display_name: string | null }[])
+      .map((p) => [p.id, p.display_name ?? 'Unnamed']),
+  );
+
+  for (const r of ((teamRes.data ?? []) as { deal_id: string | null; entity_id: string | null }[])) {
+    if (!r.deal_id || !r.entity_id || directIds.has(r.deal_id) || out.has(r.deal_id)) continue;
+    out.set(r.deal_id, nameById.get(r.entity_id) ?? 'a team member');
+  }
+  return out;
 }
