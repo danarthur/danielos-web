@@ -72,7 +72,7 @@ export function ProductionCapturesPanel({
   if (isLoading && captures.length === 0) {
     return (
       <div
-        className="border-t border-[var(--stage-edge-subtle)] pt-4 space-y-2"
+        className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)] space-y-2"
         data-surface="elevated"
       >
         <div className="h-3 w-24 rounded stage-skeleton" />
@@ -83,7 +83,7 @@ export function ProductionCapturesPanel({
 
   return (
     <div
-      className="border-t border-[var(--stage-edge-subtle)] pt-4 space-y-3"
+      className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)] space-y-3"
       data-surface="elevated"
     >
       <div className="flex items-center justify-between">

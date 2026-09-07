@@ -147,10 +147,10 @@ function Cell({
 }) {
   return (
     <span className="inline-flex items-baseline gap-1">
-      <span className="text-[10px] uppercase tracking-wider text-[var(--stage-text-tertiary)]">
+      <span className="text-[10px] uppercase tracking-wider text-[var(--stage-text-secondary)]">
         {label}
       </span>
-      <span className={muted ? 'text-[var(--stage-text-tertiary)]' : 'text-[var(--stage-text-primary)]'}>
+      <span className={muted ? 'text-[var(--stage-text-secondary)]' : 'text-[var(--stage-text-primary)]'}>
         {value}
       </span>
     </span>

@@ -71,7 +71,7 @@ export function UpcomingAssignments({ entityId }: { entityId: string }) {
   if (!loading && count === 0) return null;
 
   return (
-    <div className="border-t border-[var(--stage-edge-subtle)] pt-4" data-surface="elevated">
+    <div className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)]" data-surface="elevated">
       {/* Heading */}
       <button
         type="button"

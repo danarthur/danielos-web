@@ -50,7 +50,7 @@ export function InviteCard({
   };
 
   return (
-    <div className="border-t border-[var(--stage-edge-subtle)] pt-4">
+    <div className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)]">
       <div className="flex items-center justify-between gap-3">
         <div className="flex-1 min-w-0">
           <h3 className="text-[length:var(--stage-data-size)] font-medium text-[var(--stage-text-primary)]">
@@ -153,7 +153,7 @@ export function RosterStatusCard({
   };
 
   return (
-    <div className="rounded-[var(--stage-radius-panel)] bg-[var(--ctx-card)] p-4 space-y-3" data-surface="elevated">
+    <div className="rounded-[var(--stage-radius-panel)] bg-[var(--ctx-card)] p-[var(--stage-padding)] space-y-3" data-surface="elevated">
       <h3 className="stage-label text-[var(--stage-text-secondary)]">
         Roster actions
       </h3>

@@ -94,7 +94,7 @@ export function ReferralsCard({ workspaceId, entityId }: ReferralsCardProps) {
           'w-full text-left inline-flex items-center gap-2 px-3 py-2',
           'rounded-md border border-dashed border-[var(--stage-edge-subtle)]',
           'bg-transparent',
-          'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)]',
+          'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-secondary)]',
           'hover:border-[var(--stage-edge-top)] transition-colors',
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/50',
         )}
@@ -112,12 +112,12 @@ export function ReferralsCard({ workspaceId, entityId }: ReferralsCardProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={STAGE_LIGHT}
-      className="border-t border-[var(--stage-edge-subtle)] pt-4 space-y-3"
+      className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)] space-y-3"
       data-surface="elevated"
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <Handshake className="size-3 text-[var(--stage-text-tertiary)]" strokeWidth={1.5} />
+          <Handshake className="size-3 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
           <h3 className="stage-label text-[var(--stage-text-secondary)]">Referrals</h3>
           {referrals && (
             <span className="text-[10px] text-[var(--stage-text-tertiary)] tabular-nums">
@@ -129,7 +129,7 @@ export function ReferralsCard({ workspaceId, entityId }: ReferralsCardProps) {
           type="button"
           onClick={() => setFormOpen((v) => !v)}
           className={cn(
-            'p-1 rounded-md text-[var(--stage-text-tertiary)]',
+            'p-1 rounded-md text-[var(--stage-text-secondary)]',
             'hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.06)]',
             'transition-colors',
           )}
@@ -255,7 +255,7 @@ function ReferralForm({
           'w-full text-sm px-2 py-1.5 rounded-md',
           'border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)]',
           'text-[var(--stage-text-primary)]',
-          'placeholder:text-[var(--stage-text-tertiary)]',
+          'placeholder:text-[var(--stage-text-secondary)]',
           'focus:outline-none focus:ring-1 focus:ring-[var(--stage-accent)]/50',
         )}
       />
@@ -269,7 +269,7 @@ function ReferralForm({
           'w-full text-xs px-2 py-1.5 rounded-md',
           'border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)]',
           'text-[var(--stage-text-primary)]',
-          'placeholder:text-[var(--stage-text-tertiary)]',
+          'placeholder:text-[var(--stage-text-secondary)]',
           'focus:outline-none focus:ring-1 focus:ring-[var(--stage-accent)]/50',
         )}
       />
@@ -363,7 +363,7 @@ function ReferralRow({
         <p className="text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)] truncate">
           {referral.clientName ?? 'Unnamed lead'}
         </p>
-        <div className="flex items-center gap-2 text-[11px] text-[var(--stage-text-tertiary)]">
+        <div className="flex items-center gap-2 text-[11px] text-[var(--stage-text-secondary)]">
           <span className="tabular-nums">{relative}</span>
           {referral.createdByName && (
             <span>· {referral.createdByName}</span>
@@ -373,7 +373,7 @@ function ReferralRow({
           // "at the time" is load-bearing, not decoration: the person may have
           // moved since, and this states which era the credit belongs to
           // rather than implying they still work there.
-          <p className="text-[11px] text-[var(--stage-text-tertiary)] truncate">
+          <p className="text-[11px] text-[var(--stage-text-secondary)] truncate">
             {referral.counterparty.nameAtReferral ?? 'Unknown'}
             {' · '}
             <span className="text-[var(--stage-text-secondary)]">
@@ -404,7 +404,7 @@ function ReferralRow({
           'shrink-0 p-1 rounded-md transition-all',
           confirmDelete
             ? 'text-[var(--color-unusonic-error)]'
-            : 'text-[var(--stage-text-tertiary)] opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
+            : 'text-[var(--stage-text-secondary)] opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
           'hover:text-[var(--color-unusonic-error)] hover:bg-[oklch(1_0_0/0.06)]',
         )}
       >

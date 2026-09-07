@@ -105,7 +105,7 @@ export function EmploymentCard({ workspaceId, entityId }: EmploymentCardProps) {
   return (
     <motion.div
       initial={false}
-      className="flex flex-col gap-3 border-t border-[var(--stage-edge-subtle)] pt-4"
+      className="flex flex-col gap-3 border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)]"
     >
       <CardHeader canMove={current.length > 0 && !moving} onMove={() => setMoving(true)} />
 
@@ -152,7 +152,7 @@ function CardHeader({ canMove, onMove }: { canMove: boolean; onMove: () => void 
   return (
     <div className="flex items-center justify-between gap-2">
       <div className="flex items-center gap-1.5">
-        <Building2 className="size-3 text-[var(--stage-text-tertiary)]" strokeWidth={1.5} />
+        <Building2 className="size-3 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
         <h3 className="stage-label text-[var(--stage-text-secondary)]">Works at</h3>
       </div>
       {canMove && (
@@ -160,7 +160,7 @@ function CardHeader({ canMove, onMove }: { canMove: boolean; onMove: () => void 
           type="button"
           onClick={onMove}
           className={cn(
-            'stage-badge-text rounded-md px-2 py-1 text-[var(--stage-text-tertiary)]',
+            'stage-badge-text rounded-md px-2 py-1 text-[var(--stage-text-secondary)]',
             'hover:bg-[oklch(1_0_0/0.06)] hover:text-[var(--stage-text-primary)] transition-colors',
             'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
           )}
@@ -176,7 +176,7 @@ function CardHeader({ canMove, onMove }: { canMove: boolean; onMove: () => void 
 function CurrentEmployers({ stints, showEmpty }: { stints: EmploymentStint[]; showEmpty: boolean }) {
   if (stints.length === 0) {
     if (!showEmpty) return null;
-    return <p className="stage-label text-[var(--stage-text-tertiary)]">No current employer on file.</p>;
+    return <p className="stage-label text-[var(--stage-text-secondary)]">No current employer on file.</p>;
   }
   return (
     <>
@@ -204,7 +204,7 @@ function FormerEmployers({ stints }: { stints: EmploymentStint[] }) {
   if (stints.length === 0) return null;
   return (
     <div className="flex flex-col gap-2 border-t border-[var(--stage-border)] pt-3">
-      <p className="stage-label text-[var(--stage-text-tertiary)]">Previously</p>
+      <p className="stage-label text-[var(--stage-text-secondary)]">Previously</p>
       {stints.map((s) => (
         <div key={`${s.companyId}-${s.endedAt}`} className="flex items-baseline justify-between gap-3">
           <span className="truncate stage-label text-[var(--stage-text-secondary)]">
@@ -214,10 +214,10 @@ function FormerEmployers({ stints }: { stints: EmploymentStint[] }) {
             >
               {s.companyName}
             </Link>
-            {s.jobTitle && <span className="text-[var(--stage-text-tertiary)]"> · {s.jobTitle}</span>}
+            {s.jobTitle && <span className="text-[var(--stage-text-secondary)]"> · {s.jobTitle}</span>}
           </span>
           {stintRange(s) && (
-            <span className="shrink-0 stage-badge-text tabular-nums text-[var(--stage-text-tertiary)]">
+            <span className="shrink-0 stage-badge-text tabular-nums text-[var(--stage-text-secondary)]">
               {stintRange(s)}
             </span>
           )}
@@ -271,7 +271,7 @@ function MovePicker({
             type="button"
             onClick={onCancel}
             aria-label="Cancel move"
-            className="rounded-md p-1 text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)] transition-colors"
+            className="rounded-md p-1 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
           >
             <X className="size-3.5" strokeWidth={1.5} />
           </button>
@@ -291,7 +291,7 @@ function MovePicker({
         </div>
 
         {q.trim().length >= 2 && options.length === 0 && (
-          <p className="stage-label text-[var(--stage-text-tertiary)]">No companies match.</p>
+          <p className="stage-label text-[var(--stage-text-secondary)]">No companies match.</p>
         )}
 
         <div className="flex flex-col">
@@ -309,15 +309,15 @@ function MovePicker({
             >
               <span className="truncate text-xs text-[var(--stage-text-primary)]">{o.name}</span>
               {saving ? (
-                <Check className="size-3 shrink-0 text-[var(--stage-text-tertiary)]" strokeWidth={1.5} />
+                <Check className="size-3 shrink-0 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
               ) : (
-                <ArrowRight className="size-3 shrink-0 text-[var(--stage-text-tertiary)]" strokeWidth={1.5} />
+                <ArrowRight className="size-3 shrink-0 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
               )}
             </button>
           ))}
         </div>
 
-        <p className="stage-badge-text text-[var(--stage-text-tertiary)]">
+        <p className="stage-badge-text text-[var(--stage-text-secondary)]">
           Past shows and referrals keep the old company.
         </p>
       </div>

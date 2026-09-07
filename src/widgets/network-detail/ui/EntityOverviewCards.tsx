@@ -78,11 +78,11 @@ export function EntityOverviewCards({
 
   return (
     <div
-      className={cn(
-        'flex flex-col',
-        density === 'page' ? 'gap-6' : 'gap-7',
-        className,
-      )}
+      className={cn('flex flex-col', className)}
+      /* Between zones. Ratio against the intra-zone gap below lands at
+         2.5:1 spacious, 3.2:1 balanced, 3:1 dense -- above the 2:1 where
+         grouping becomes pre-attentive, at every tier. */
+      style={{ gap: 'calc(var(--stage-padding) * 2)' }}
     >
       {density === 'page' && (
         <PromotedMetricsRow
@@ -157,9 +157,16 @@ export function EntityOverviewCards({
  */
 function Zone({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-3 [&:not(:has(>div>*))]:hidden">
-      <h2 className="stage-label text-[var(--stage-text-tertiary)]">{label}</h2>
-      <div className="flex flex-col gap-4">{children}</div>
+    <section
+      className="flex flex-col [&:not(:has(>div>*))]:hidden"
+      style={{ gap: 'var(--stage-gap)' }}
+    >
+      {/* Secondary, not tertiary: this heading governs the card headings below
+          it and was rendering dimmer than them -- the hierarchy was inverted at
+          exactly the level meant to create it. .stage-label supplies secondary
+          on its own. */}
+      <h2 className="stage-label uppercase" style={{ letterSpacing: '0.1em' }}>{label}</h2>
+      <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide)' }}>{children}</div>
     </section>
   );
 }

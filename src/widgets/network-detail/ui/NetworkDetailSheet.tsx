@@ -254,7 +254,7 @@ export function NetworkDetailSheet({ nodeId, kind, details: detailsProp, onClose
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={STAGE_NAV_CROSSFADE}
-                  className="space-y-5"
+                  className="flex flex-col" style={{ gap: 'var(--stage-gap-wide)' }}
                 >
                   <TransmissionPanel
                     details={details}

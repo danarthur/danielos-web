@@ -46,7 +46,7 @@ function DealRow({ deal }: { deal: EntityDeal }) {
         )}
       </div>
       {deal.budget_estimated != null && (
-        <span className="shrink-0 text-[length:var(--stage-data-size)] font-mono tabular-nums text-[var(--stage-text-secondary)]">
+        <span className="shrink-0 stage-readout text-[var(--stage-text-secondary)]">
           {formatCurrency(deal.budget_estimated)}
         </span>
       )}
@@ -92,7 +92,7 @@ export function DealHistoryPanel({ entityId }: { entityId: string }) {
   // Loading
   if (deals === null) {
     return (
-      <div className="border-t border-[var(--stage-edge-subtle)] pt-4" data-surface="elevated">
+      <div className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)]" data-surface="elevated">
         <h3 className="stage-label text-[var(--stage-text-secondary)] mb-3">
           Deals
         </h3>
@@ -114,7 +114,7 @@ export function DealHistoryPanel({ entityId }: { entityId: string }) {
   const hiddenActiveCount = activeDeals.length - MAX_ACTIVE_VISIBLE;
 
   return (
-    <div className="border-t border-[var(--stage-edge-subtle)] pt-4" data-surface="elevated">
+    <div className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)]" data-surface="elevated">
       {/* Active deals */}
       {activeDeals.length > 0 && (
         <>
