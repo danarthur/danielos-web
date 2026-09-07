@@ -55,6 +55,12 @@ export interface EntityOverviewCardsProps {
    *   'page'  — fuller spacing, includes PromotedMetricsRow inline at top.
    */
   density?: 'sheet' | 'page';
+  /**
+   * The relationship in view, when there is one. Lets the notes card host its
+   * own composer instead of a second notes card living elsewhere on the sheet.
+   */
+  relationshipId?: string | null;
+  relationshipNotes?: string | null;
   className?: string;
 }
 
@@ -64,11 +70,11 @@ export function EntityOverviewCards({
   entityType,
   entityName,
   density = 'sheet',
+  relationshipId = null,
+  relationshipNotes = null,
   className,
 }: EntityOverviewCardsProps) {
-  const isPersonOrCouple = entityType === 'person' || entityType === 'couple';
-  const isCompanyOrVenue = entityType === 'company' || entityType === 'venue';
-  const isVenue = entityType === 'venue';
+  const { isPersonOrCouple, isCompanyOrVenue, isVenue } = entityShape(entityType);
 
   return (
     <div
@@ -133,6 +139,8 @@ export function EntityOverviewCards({
           entityId={entityId}
           entityName={entityName}
           entityType={entityType}
+          relationshipId={relationshipId}
+          initialNotes={relationshipNotes}
         />
       </Zone>
     </div>
@@ -154,4 +162,13 @@ function Zone({ label, children }: { label: string; children: React.ReactNode })
       <div className="flex flex-col gap-4">{children}</div>
     </section>
   );
+}
+
+/** Which cards an entity type gets. Kept out of the component so the JSX reads as layout. */
+function entityShape(entityType: EntityOverviewCardsProps['entityType']) {
+  return {
+    isPersonOrCouple: entityType === 'person' || entityType === 'couple',
+    isCompanyOrVenue: entityType === 'company' || entityType === 'venue',
+    isVenue: entityType === 'venue',
+  };
 }

@@ -57,6 +57,7 @@ import {
   searchReassignTargets,
   type ReassignTarget,
 } from '../api/search-reassign-targets';
+import { PrivateNotes } from './PrivateNotes';
 
 export interface CaptureTimelinePanelProps {
   workspaceId: string;
@@ -69,6 +70,16 @@ export interface CaptureTimelinePanelProps {
    * entity studio. Leave false for person / couple entities.
    */
   entityType?: 'person' | 'company' | 'venue' | 'couple' | null;
+  /**
+   * When present, the free-text note for this relationship is composed at the
+   * bottom of this card instead of in a second card of its own. Two boxes both
+   * headed with some form of "notes", each with its own input, read as two
+   * different things to fill in when they are one activity.
+   *
+   * Absent on the full entity page, which has no single relationship in view.
+   */
+  relationshipId?: string | null;
+  initialNotes?: string | null;
 }
 
 // Group-by-production threshold per design Decision B default: flat until
@@ -133,6 +144,8 @@ export function CaptureTimelinePanel({
   entityId,
   entityName,
   entityType = null,
+  relationshipId = null,
+  initialNotes = null,
 }: CaptureTimelinePanelProps) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -189,11 +202,10 @@ export function CaptureTimelinePanel({
     });
   }, [queryClient, workspaceId, entityId]);
 
-  // Nothing captured and nothing loading: stay out of the way. Every other card
-  // in this stack hides when empty, and leaving this one visible put a third
-  // notes-shaped box on a sheet that already had working notes and private
-  // notes -- three empty prompts reading as three different things to fill in.
-  if (!isLoading && captures.length === 0) return null;
+  // With nothing captured AND nowhere to write, there is nothing to show. When
+  // a composer is available the card stays, because the input is the reason to
+  // open it -- it just does not also print an empty-state paragraph above.
+  if (!isLoading && captures.length === 0 && !relationshipId) return null;
 
   if (isLoading && captures.length === 0) {
     return (
@@ -222,9 +234,11 @@ export function CaptureTimelinePanel({
       </div>
 
       {captures.length === 0 ? (
-        <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-tertiary)]">
-          No notes yet. Tap the composer on the lobby to leave one.
-        </p>
+        relationshipId ? null : (
+          <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-tertiary)]">
+            No notes yet. Tap the composer on the lobby to leave one.
+          </p>
+        )
       ) : mode === 'flat' ? (
         <ul className="space-y-2">
           <AnimatePresence initial={false}>
@@ -274,6 +288,15 @@ export function CaptureTimelinePanel({
         >
           Show older ({captures.length - visibleCount} more)
         </button>
+      )}
+
+      {/* Compose at the bottom, under what is already there -- the same shape as
+          every message thread, and the reason this is one card rather than a
+          list here and an input somewhere further down. */}
+      {relationshipId && (
+        <div className="border-t border-[var(--stage-edge-subtle)] pt-3">
+          <PrivateNotes relationshipId={relationshipId} initialNotes={initialNotes} />
+        </div>
       )}
     </div>
   );

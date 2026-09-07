@@ -105,10 +105,10 @@ export function WorkingNotesCard({ workspaceId, entityId }: WorkingNotesCardProp
           'hover:border-[var(--stage-edge-top)] transition-colors',
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/50',
         )}
-        aria-label="Add working notes"
+        aria-label="Add handling preferences"
       >
         <Pencil className="size-3" strokeWidth={1.5} />
-        <span className="text-[11px]">Add working notes</span>
+        <span className="text-[11px]">Add handling preferences</span>
       </button>
     );
   }
@@ -127,7 +127,7 @@ export function WorkingNotesCard({ workspaceId, entityId }: WorkingNotesCardProp
     >
       <div className="flex items-center justify-between">
         <h3 className="stage-label text-[var(--stage-text-secondary)]">
-          Working notes
+          How to handle
         </h3>
         <button
           type="button"

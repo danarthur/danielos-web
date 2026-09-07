@@ -15,7 +15,6 @@
 import * as React from 'react';
 import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
 import { TradeLedger } from '../TradeLedger';
-import { PrivateNotes } from '../PrivateNotes';
 import { UpcomingAssignments } from '../UpcomingAssignments';
 import { CrewKitSection } from '../CrewKitSection';
 import { QuickBookAction } from '../QuickBookAction';
@@ -244,17 +243,14 @@ export function TransmissionPanel({
             entityType={t}
             entityName={details.identity.name ?? null}
             density="sheet"
+            relationshipId={details.relationshipId}
+            relationshipNotes={details.notes}
           />
         );
       })()}
 
-      {/* ── Notes card ── */}
-      <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">
-        <PrivateNotes
-          relationshipId={details.relationshipId}
-          initialNotes={details.notes}
-        />
-      </div>
+      {/* The free-text note now composes at the bottom of the Notes card inside
+          EntityOverviewCards, rather than in a second card down here. */}
 
       {/* ── Active shows ──
           Same reason: for a person this repeats the "Booked" band of
