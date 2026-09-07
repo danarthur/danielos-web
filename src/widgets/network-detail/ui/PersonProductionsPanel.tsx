@@ -63,7 +63,7 @@ export function PersonProductionsPanel({
   if (isLoading) {
     return (
       <div
-        className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-2"
+        className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)] space-y-2"
         data-surface="elevated"
       >
         <div className="h-3 w-24 rounded stage-skeleton" />
@@ -86,7 +86,7 @@ export function PersonProductionsPanel({
 
   return (
     <div
-      className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-3"
+      className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)] space-y-3"
       data-surface="elevated"
     >
       <div className="flex items-center justify-between">
@@ -184,7 +184,7 @@ function CollapsedPastSection({
         <motion.span
           animate={{ rotate: expanded ? 180 : 0 }}
           transition={STAGE_MEDIUM}
-          className="ml-auto text-[var(--stage-text-tertiary)]"
+          className="ml-auto text-[var(--stage-text-secondary)]"
         >
           <ChevronDown className="size-3" strokeWidth={1.5} />
         </motion.span>
@@ -239,12 +239,12 @@ function ProductionRow({
               {production.title ?? 'untitled'}
             </span>
             {production.role && (
-              <span className="text-[11px] text-[var(--stage-text-tertiary)] shrink-0">
+              <span className="text-[11px] text-[var(--stage-text-secondary)] shrink-0">
                 · {production.role}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-[var(--stage-text-tertiary)]">
+          <div className="flex items-center gap-2 text-[11px] text-[var(--stage-text-secondary)]">
             {dateLabel && <span className="tabular-nums">{dateLabel}</span>}
             {production.status && <span>· {formatStatus(production.status)}</span>}
             {production.amountEstimated != null && (
@@ -253,7 +253,7 @@ function ProductionRow({
           </div>
         </div>
         <ArrowUpRight
-          className="size-3 shrink-0 mt-0.5 text-[var(--stage-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity"
+          className="size-3 shrink-0 mt-0.5 text-[var(--stage-text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity"
           strokeWidth={1.5}
         />
       </Link>

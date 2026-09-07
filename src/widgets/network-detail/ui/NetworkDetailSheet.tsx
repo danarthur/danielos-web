@@ -203,7 +203,7 @@ export function NetworkDetailSheet({ nodeId, kind, details: detailsProp, onClose
             <ContactStrip details={details} />
 
             {/* Tab strip with sliding indicator */}
-            <div className="shrink-0 border-b border-[var(--stage-edge-subtle)] px-6">
+            <div className="shrink-0 border-b border-[oklch(1_0_0_/_0.06)] px-6">
               <div className="relative flex h-12" role="tablist">
                 {getTabsForDetail(details).map((tab) => {
                   const displayLabel = tab.id === 'crew' && details.entityDirectoryType === 'venue'
@@ -254,7 +254,7 @@ export function NetworkDetailSheet({ nodeId, kind, details: detailsProp, onClose
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={STAGE_NAV_CROSSFADE}
-                  className="space-y-5"
+                  className="flex flex-col" style={{ gap: 'var(--stage-gap-wide)' }}
                 >
                   <TransmissionPanel
                     details={details}

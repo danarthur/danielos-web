@@ -17,15 +17,15 @@ export function TradeLedger({ details }: TradeLedgerProps) {
       <h3 className="stage-label text-[var(--stage-text-secondary)]">
         Ledger
       </h3>
-      <div className="flex justify-between text-[length:var(--stage-data-size)] mb-2">
-        <span className="text-[var(--stage-text-secondary)]">In</span>
-        <span className="font-mono tabular-nums text-[var(--stage-text-primary)]">
+      <div className="flex justify-between mb-2">
+        <span className="stage-label">In</span>
+        <span className="stage-readout">
           ${inbound.toLocaleString()}
         </span>
       </div>
-      <div className="flex justify-between text-[length:var(--stage-data-size)] mb-3">
-        <span className="text-[var(--stage-text-secondary)]">Out</span>
-        <span className="font-mono tabular-nums text-[var(--stage-text-primary)]">
+      <div className="flex justify-between mb-3">
+        <span className="stage-label">Out</span>
+        <span className="stage-readout">
           ${outbound.toLocaleString()}
         </span>
       </div>

@@ -57,6 +57,8 @@ import {
   searchReassignTargets,
   type ReassignTarget,
 } from '../api/search-reassign-targets';
+import { PrivateNotes } from './PrivateNotes';
+import { formatRelative } from '@/shared/lib/format-relative';
 
 export interface CaptureTimelinePanelProps {
   workspaceId: string;
@@ -69,6 +71,16 @@ export interface CaptureTimelinePanelProps {
    * entity studio. Leave false for person / couple entities.
    */
   entityType?: 'person' | 'company' | 'venue' | 'couple' | null;
+  /**
+   * When present, the free-text note for this relationship is composed at the
+   * bottom of this card instead of in a second card of its own. Two boxes both
+   * headed with some form of "notes", each with its own input, read as two
+   * different things to fill in when they are one activity.
+   *
+   * Absent on the full entity page, which has no single relationship in view.
+   */
+  relationshipId?: string | null;
+  initialNotes?: string | null;
 }
 
 // Group-by-production threshold per design Decision B default: flat until
@@ -133,6 +145,8 @@ export function CaptureTimelinePanel({
   entityId,
   entityName,
   entityType = null,
+  relationshipId = null,
+  initialNotes = null,
 }: CaptureTimelinePanelProps) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -189,10 +203,15 @@ export function CaptureTimelinePanel({
     });
   }, [queryClient, workspaceId, entityId]);
 
+  // With nothing captured AND nowhere to write, there is nothing to show. When
+  // a composer is available the card stays, because the input is the reason to
+  // open it -- it just does not also print an empty-state paragraph above.
+  if (!isLoading && captures.length === 0 && !relationshipId) return null;
+
   if (isLoading && captures.length === 0) {
     return (
       <div
-        className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-2"
+        className="rounded-[var(--stage-radius-panel)] bg-[var(--ctx-card)] p-[var(--stage-padding)] space-y-2"
         data-surface="elevated"
       >
         <div className="h-3 w-24 rounded stage-skeleton" />
@@ -203,7 +222,7 @@ export function CaptureTimelinePanel({
 
   return (
     <div
-      className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-3"
+      className="rounded-[var(--stage-radius-panel)] bg-[var(--ctx-card)] p-[var(--stage-padding)] space-y-3"
       data-surface="elevated"
     >
       <div className="flex items-center justify-between">
@@ -216,9 +235,11 @@ export function CaptureTimelinePanel({
       </div>
 
       {captures.length === 0 ? (
-        <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-tertiary)]">
-          No notes yet. Tap the composer on the lobby to leave one.
-        </p>
+        relationshipId ? null : (
+          <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-tertiary)]">
+            No notes yet. Tap the composer on the lobby to leave one.
+          </p>
+        )
       ) : mode === 'flat' ? (
         <ul className="space-y-2">
           <AnimatePresence initial={false}>
@@ -268,6 +289,15 @@ export function CaptureTimelinePanel({
         >
           Show older ({captures.length - visibleCount} more)
         </button>
+      )}
+
+      {/* Compose at the bottom, under what is already there -- the same shape as
+          every message thread, and the reason this is one card rather than a
+          list here and an input somewhere further down. */}
+      {relationshipId && (
+        <div className="border-t border-[var(--stage-edge-subtle)] pt-3">
+          <PrivateNotes relationshipId={relationshipId} initialNotes={initialNotes} />
+        </div>
       )}
     </div>
   );
@@ -530,7 +560,7 @@ function CaptureRowMenu({
       visibility: next,
     });
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(result.error, { duration: Infinity });
       return;
     }
     toast.success(next === 'workspace' ? 'Shared with team.' : 'Made private.');
@@ -549,7 +579,7 @@ function CaptureRowMenu({
       captureId: capture.id,
     });
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(result.error, { duration: Infinity });
       return;
     }
     toast.success('Deleted.');
@@ -703,7 +733,7 @@ function CaptureEditor({
     });
     setSaving(false);
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(result.error, { duration: Infinity });
       return;
     }
     toast.success('Saved.');
@@ -810,7 +840,7 @@ function ReassignDialog({
     });
     setReassigning(false);
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(result.error, { duration: Infinity });
       return;
     }
     toast.success(`Moved to ${target.name}.`);
@@ -898,7 +928,7 @@ function ReassignDialog({
                 });
                 setReassigning(false);
                 if (!result.ok) {
-                  toast.error(result.error);
+                  toast.error(result.error, { duration: Infinity });
                   return;
                 }
                 toast.success('Un-assigned.');
@@ -927,16 +957,4 @@ function ReassignDialog({
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatRelative(iso: string): string {
-  const d = new Date(iso);
-  const ms = Date.now() - d.getTime();
-  const minutes = Math.floor(ms / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
 

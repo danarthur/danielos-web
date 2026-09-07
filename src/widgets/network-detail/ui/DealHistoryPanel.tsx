@@ -36,9 +36,17 @@ function DealRow({ deal }: { deal: EntityDeal }) {
         <span className="stage-badge-text px-2 py-0.5 rounded-full bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-secondary)] inline-block mt-1">
           {stageBadgeLabel(deal.status)}
         </span>
+        {/* Reached this company through one of its people. Said out loud rather
+            than folded into the company's own count -- the provenance is the
+            useful part when you are working out who actually brought the job. */}
+        {deal.viaPersonName && (
+          <span className="ml-1.5 stage-badge-text text-[var(--stage-text-tertiary)]">
+            via {deal.viaPersonName}
+          </span>
+        )}
       </div>
       {deal.budget_estimated != null && (
-        <span className="shrink-0 text-[length:var(--stage-data-size)] font-mono tabular-nums text-[var(--stage-text-secondary)]">
+        <span className="shrink-0 stage-readout text-[var(--stage-text-secondary)]">
           {formatCurrency(deal.budget_estimated)}
         </span>
       )}
@@ -48,12 +56,12 @@ function DealRow({ deal }: { deal: EntityDeal }) {
 
 function SkeletonRow() {
   return (
-    <div className="flex items-center justify-between gap-3 py-2 animate-pulse">
+    <div className="flex items-center justify-between gap-3 py-2">
       <div className="min-w-0 flex-1 space-y-2">
-        <div className="h-4 w-3/4 rounded bg-[var(--stage-surface-elevated)]" />
-        <div className="h-4 w-16 rounded-full bg-[var(--stage-surface-elevated)]" />
+        <div className="h-4 w-3/4 rounded stage-skeleton" />
+        <div className="h-4 w-16 rounded-full stage-skeleton" />
       </div>
-      <div className="h-4 w-16 rounded bg-[var(--stage-surface-elevated)]" />
+      <div className="h-4 w-16 rounded stage-skeleton" />
     </div>
   );
 }
@@ -84,7 +92,7 @@ export function DealHistoryPanel({ entityId }: { entityId: string }) {
   // Loading
   if (deals === null) {
     return (
-      <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">
+      <div className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)]" data-surface="elevated">
         <h3 className="stage-label text-[var(--stage-text-secondary)] mb-3">
           Deals
         </h3>
@@ -97,23 +105,16 @@ export function DealHistoryPanel({ entityId }: { entityId: string }) {
     );
   }
 
-  // Empty
-  if (deals.length === 0) {
-    return (
-      <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">
-        <h3 className="stage-label text-[var(--stage-text-secondary)] mb-2">
-          Deals
-        </h3>
-        <p className="text-[length:var(--stage-data-size)] text-[var(--stage-text-secondary)]">No deals</p>
-      </div>
-    );
-  }
+  // Nothing to show: render nothing. Seven peer cards already do this; the two
+  // that printed an empty box were the biggest single contributor to the sheet
+  // reading as a wall of equally-important containers.
+  if (deals.length === 0) return null;
 
   const visibleActive = activeDeals.slice(0, MAX_ACTIVE_VISIBLE);
   const hiddenActiveCount = activeDeals.length - MAX_ACTIVE_VISIBLE;
 
   return (
-    <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">
+    <div className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)]" data-surface="elevated">
       {/* Active deals */}
       {activeDeals.length > 0 && (
         <>
@@ -125,9 +126,11 @@ export function DealHistoryPanel({ entityId }: { entityId: string }) {
               <DealRow key={deal.id} deal={deal} />
             ))}
           </div>
+          {/* A count, not a control -- there is no expand behind it. Tertiary
+              so it does not read as something to click. */}
           {hiddenActiveCount > 0 && (
-            <p className="mt-1 text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
-              +{hiddenActiveCount} more
+            <p className="mt-1 stage-label text-[var(--stage-text-tertiary)]">
+              +{hiddenActiveCount} not shown
             </p>
           )}
         </>

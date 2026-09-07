@@ -45,12 +45,6 @@ export function PrivateNotes({ relationshipId, initialNotes }: PrivateNotesProps
 
   return (
     <div className="space-y-2">
-      <h3 className="stage-label text-[var(--stage-text-secondary)]">
-        Notes
-      </h3>
-      <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)] mb-2">
-        Private. Auto-saves.
-      </p>
       <form
         action={submitAction}
         className="space-y-2"
@@ -64,7 +58,7 @@ export function PrivateNotes({ relationshipId, initialNotes }: PrivateNotesProps
         <Textarea
           name="notes"
           defaultValue={initialNotes ?? ''}
-          placeholder="Notes about this partner…"
+          placeholder="Private note — saves automatically"
           className="stage-input min-h-[100px] resize-y"
           rows={4}
         />

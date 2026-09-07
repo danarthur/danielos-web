@@ -36,7 +36,7 @@ export function ContactStrip({ details }: { details: NodeDetail }) {
   const email = showEmployeeStrip ? details.identity.email : details.personEmail;
 
   return (
-    <div className="px-6 py-3 space-y-2 border-b border-[var(--stage-edge-subtle)]">
+    <div className="px-6 py-3 space-y-2">
       {/* Contact links */}
       {(phone || email) && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">

@@ -48,7 +48,7 @@ export function VenueSpecsCompactCard({ workspaceId, entityId }: VenueSpecsCompa
       initial={{ opacity: 0, y: 2 }}
       animate={{ opacity: 1, y: 0 }}
       transition={STAGE_LIGHT}
-      className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-3"
+      className="rounded-[var(--stage-radius-panel)] bg-[var(--ctx-card)] p-[var(--stage-padding)] space-y-3"
       data-surface="elevated"
     >
       <h3 className="stage-label text-[var(--stage-text-secondary)]">Venue specs</h3>
@@ -61,18 +61,18 @@ export function VenueSpecsCompactCard({ workspaceId, entityId }: VenueSpecsCompa
         {rows.map((row) => (
           <div key={row.key} className="flex items-start gap-2">
             <row.Icon
-              className="size-3.5 shrink-0 mt-0.5 text-[var(--stage-text-tertiary)]"
+              className="size-3.5 shrink-0 mt-0.5 text-[var(--stage-text-secondary)]"
               strokeWidth={1.5}
             />
             <div className="min-w-0">
-              <dt className="stage-label text-[var(--stage-text-tertiary)]">
+              <dt className="stage-label text-[var(--stage-text-secondary)]">
                 {row.label}
               </dt>
-              <dd className="text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)] leading-snug tabular-nums">
+              <dd className="stage-readout leading-snug">
                 {row.value}
               </dd>
               {row.sub && (
-                <p className="text-[11px] text-[var(--stage-text-tertiary)] mt-0.5">
+                <p className="text-[11px] text-[var(--stage-text-secondary)] mt-0.5">
                   {row.sub}
                 </p>
               )}

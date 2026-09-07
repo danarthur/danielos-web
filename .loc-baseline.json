@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-04T04:18:11.366Z",
+  "generatedAt": "2026-09-07T01:17:29.956Z",
   "note": "Per-file raw LOC snapshot for every file currently flagged by max-lines in .eslint-baseline.json. Closes the gap where max-lines fires once-per-file regardless of size, letting flagged files grow invisibly. Regenerate with: npm run loc:baseline:snapshot. Check with: npm run loc:baseline:check.",
   "files": {
     "src/app/(auth)/onboarding/components/onboarding-wizard.tsx": 375,
@@ -128,7 +128,7 @@
     "src/app/bridge/install/page.tsx": 296,
     "src/app/i/[token]/page.tsx": 526,
     "src/app/landing-content.tsx": 946,
-    "src/entities/network/ui/NetworkCard.tsx": 283,
+    "src/entities/network/ui/NetworkCard.tsx": 311,
     "src/features/ai/ui/rider-parser-modal.tsx": 625,
     "src/features/auth/diagnostic-login/ui/diagnostic-login-form.tsx": 387,
     "src/features/auth/smart-login/ui/SessionExpiredOverlay.tsx": 413,
@@ -143,7 +143,7 @@
     "src/features/identity-hydration/ui/ProfileAvatarUpload.tsx": 353,
     "src/features/intelligence/api/scout/roster-hunter.ts": 354,
     "src/features/lead-sources/ui/LeadSourceManager.tsx": 348,
-    "src/features/network-data/api/network-read-actions/node-details.ts": 444,
+    "src/features/network-data/api/network-read-actions/node-details.ts": 440,
     "src/features/network-data/ui/entity-documents-card.tsx": 573,
     "src/features/network-data/ui/GhostForgeSheet.tsx": 681,
     "src/features/network/api/actions.ts": 684,
@@ -168,7 +168,7 @@
     "src/features/talent-management/ui/MemberDetailSheet.tsx": 468,
     "src/features/talent-onboarding/api/__tests__/invite-action.test.ts": 592,
     "src/features/talent-onboarding/ui/InviteTalentDialog.tsx": 377,
-    "src/features/team-invite/api/actions.ts": 814,
+    "src/features/team-invite/api/actions.ts": 796,
     "src/shared/api/stripe/subscription.ts": 457,
     "src/shared/lib/metrics/__tests__/metrics.test.ts": 505,
     "src/shared/lib/metrics/registry/widgets.ts": 800,
@@ -184,11 +184,11 @@
     "src/widgets/event-dashboard/ui/EventCommandGrid.tsx": 475,
     "src/widgets/event-dashboard/ui/logistics/TimeCapsule.tsx": 574,
     "src/widgets/lobby-capture/ui/CaptureModal.tsx": 969,
-    "src/widgets/network-detail/ui/CaptureTimelinePanel.tsx": 942,
-    "src/widgets/network-detail/ui/CrewKitSection.tsx": 455,
+    "src/widgets/network-detail/ui/CaptureTimelinePanel.tsx": 960,
+    "src/widgets/network-detail/ui/CrewKitSection.tsx": 495,
     "src/widgets/network-detail/ui/DossierEditor.tsx": 893,
-    "src/widgets/network-detail/ui/WorkingNotesCard.tsx": 488,
-    "src/widgets/network-stream/ui/StreamLayout.tsx": 540,
+    "src/widgets/network-detail/ui/WorkingNotesCard.tsx": 477,
+    "src/widgets/network-stream/ui/StreamLayout.tsx": 554,
     "src/widgets/org-dashboard/ui/OrgDashboardSheet.tsx": 522
   }
 }

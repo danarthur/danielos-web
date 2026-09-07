@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Calendar } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { getEntityCrewSchedule, type CrewScheduleEntry } from '@/features/ops/actions/get-entity-crew-schedule';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
@@ -32,12 +32,12 @@ function StatusBadge({ status }: { status: CrewScheduleEntry['status'] }) {
 
 function SkeletonRow() {
   return (
-    <div className="flex items-center justify-between py-2 animate-pulse">
+    <div className="flex items-center justify-between py-2">
       <div className="space-y-1.5 flex-1 min-w-0">
-        <div className="h-3.5 w-32 rounded bg-[var(--stage-surface-elevated)]" />
-        <div className="h-3 w-48 rounded bg-[var(--stage-surface-elevated)]" />
+        <div className="h-3.5 w-32 rounded stage-skeleton" />
+        <div className="h-3 w-48 rounded stage-skeleton" />
       </div>
-      <div className="h-5 w-16 rounded-full bg-[var(--stage-surface-elevated)]" />
+      <div className="h-5 w-16 rounded-full stage-skeleton" />
     </div>
   );
 }
@@ -66,8 +66,12 @@ export function UpcomingAssignments({ entityId }: { entityId: string }) {
   const hasMore = entries.length > MAX_VISIBLE;
   const count = entries.length;
 
+  // Same rule as its peers: nothing scheduled means nothing rendered, rather
+  // than a card whose only content is the words "No upcoming assignments".
+  if (!loading && count === 0) return null;
+
   return (
-    <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">
+    <div className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)]" data-surface="elevated">
       {/* Heading */}
       <button
         type="button"
@@ -112,12 +116,6 @@ export function UpcomingAssignments({ entityId }: { entityId: string }) {
                 </div>
               )}
 
-              {!loading && count === 0 && (
-                <div className="flex items-center gap-2 py-3 text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
-                  <Calendar className="size-3.5" strokeWidth={1.5} />
-                  No upcoming assignments
-                </div>
-              )}
 
               {!loading && count > 0 && (
                 <div className="divide-y divide-[var(--stage-edge-subtle)]">
@@ -139,9 +137,11 @@ export function UpcomingAssignments({ entityId }: { entityId: string }) {
                 </div>
               )}
 
+              {/* Same: a count, not a control. cursor-default was already
+                  admitting it did nothing. */}
               {hasMore && (
-                <p className="pt-2 stage-label text-[var(--stage-text-secondary)] cursor-default">
-                  +{entries.length - MAX_VISIBLE} more
+                <p className="pt-2 stage-label text-[var(--stage-text-tertiary)]">
+                  +{entries.length - MAX_VISIBLE} not shown
                 </p>
               )}
             </div>

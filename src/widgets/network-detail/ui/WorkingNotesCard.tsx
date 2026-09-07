@@ -36,6 +36,7 @@ import {
   updateWorkingNotes,
   type UpdateWorkingNotesPatch,
 } from '../api/update-working-notes';
+import { formatRelative } from '@/shared/lib/format-relative';
 
 export interface WorkingNotesCardProps {
   workspaceId: string;
@@ -76,7 +77,7 @@ export function WorkingNotesCard({ workspaceId, entityId }: WorkingNotesCardProp
       });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : 'Could not save.');
+      toast.error(err instanceof Error ? err.message : 'Could not save.', { duration: Infinity });
     },
   });
 
@@ -105,10 +106,10 @@ export function WorkingNotesCard({ workspaceId, entityId }: WorkingNotesCardProp
           'hover:border-[var(--stage-edge-top)] transition-colors',
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/50',
         )}
-        aria-label="Add working notes"
+        aria-label="Add handling preferences"
       >
         <Pencil className="size-3" strokeWidth={1.5} />
-        <span className="text-[11px]">Add working notes</span>
+        <span className="text-[11px]">Add handling preferences</span>
       </button>
     );
   }
@@ -120,14 +121,14 @@ export function WorkingNotesCard({ workspaceId, entityId }: WorkingNotesCardProp
       animate={{ opacity: 1 }}
       transition={STAGE_LIGHT}
       className={cn(
-        'group rounded-xl border border-[var(--stage-edge-subtle)]',
+        'group rounded-[var(--stage-radius-panel)]',
         'bg-[var(--stage-surface-elevated)] p-4 space-y-3',
       )}
       data-surface="elevated"
     >
       <div className="flex items-center justify-between">
         <h3 className="stage-label text-[var(--stage-text-secondary)]">
-          Working notes
+          How to handle
         </h3>
         <button
           type="button"
@@ -372,7 +373,7 @@ function WorkingNotesEditor({
                 'border text-xs transition-colors',
                 channel === c.value
                   ? 'border-[var(--stage-accent)]/50 bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-primary)]'
-                  : 'border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]',
+                  : 'border-transparent bg-[var(--ctx-well)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]',
               )}
             >
               <c.Icon className="size-3" strokeWidth={1.5} />
@@ -474,15 +475,3 @@ function Label({ children }: { children: React.ReactNode }) {
   );
 }
 
-function formatRelative(iso: string): string {
-  const d = new Date(iso);
-  const ms = Date.now() - d.getTime();
-  const minutes = Math.floor(ms / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}

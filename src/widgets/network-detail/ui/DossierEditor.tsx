@@ -178,14 +178,14 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
           (relResult.ok === false ? relResult.error : null) ||
           (notesResult.ok === false ? notesResult.error : null);
         if (err) {
-          toast.error(err);
+          toast.error(err, { duration: Infinity });
           return;
         }
 
         if (data.roster?.length) {
           const rosterResult = await addScoutRosterToGhostOrg(sourceOrgId, ghostOrgId, data.roster);
           if (rosterResult.error) {
-            toast.error(rosterResult.error);
+            toast.error(rosterResult.error, { duration: Infinity });
             return;
           }
           if (rosterResult.addedCount > 0) {
@@ -237,7 +237,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
 
       const err = profileResult.error || (relResult.ok === false ? relResult.error : null) || (notesResult.ok === false ? notesResult.error : null);
       if (err) {
-        toast.error(err);
+        toast.error(err, { duration: Infinity });
       } else {
         toast.success('Saved');
         onOpenChange(false);
