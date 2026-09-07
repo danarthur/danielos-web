@@ -26,6 +26,7 @@ import {
   getTeamPreview,
   type TeamMemberPreview,
 } from '../api/get-team-preview';
+import { formatRelative } from '@/shared/lib/format-relative';
 
 export interface TeamCardProps {
   workspaceId: string;
@@ -188,15 +189,3 @@ function TeamRow({
   );
 }
 
-function formatRelative(iso: string): string {
-  const d = new Date(iso);
-  const ms = Date.now() - d.getTime();
-  const minutes = Math.floor(ms / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}

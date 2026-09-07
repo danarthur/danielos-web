@@ -31,6 +31,7 @@ import {
   type ReferralDirection,
 } from '../api/get-referrals';
 import { logReferral, deleteReferral } from '../api/log-referral';
+import { formatRelative } from '@/shared/lib/format-relative';
 
 export interface ReferralsCardProps {
   workspaceId: string;
@@ -61,7 +62,7 @@ export function ReferralsCard({ workspaceId, entityId }: ReferralsCardProps) {
         setFormOpen(false);
         invalidate();
       } else {
-        toast.error(result.error);
+        toast.error(result.error, { duration: Infinity });
       }
     },
   });
@@ -414,15 +415,3 @@ function ReferralRow({
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatRelative(iso: string): string {
-  const d = new Date(iso);
-  const ms = Date.now() - d.getTime();
-  const minutes = Math.floor(ms / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}

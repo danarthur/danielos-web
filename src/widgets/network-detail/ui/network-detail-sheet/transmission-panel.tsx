@@ -157,46 +157,10 @@ export function TransmissionPanel({
         })()
       }
 
-      {/* ── Partner: Venue specs (on surface) ── */}
-      {isPartner && details.entityDirectoryType === 'venue' && details.orgVenueSpecs && (() => {
-        const specs = details.orgVenueSpecs!;
-        const hasAny = specs.capacity || specs.load_in_notes || specs.power_notes || specs.stage_notes;
-        if (!hasAny) return null;
-        return (
-          <>
-            <div className="h-px bg-[var(--stage-edge-subtle)]" />
-            <div className="space-y-3">
-              <h3 className="stage-label text-[var(--stage-text-secondary)]">Venue specs</h3>
-              <dl className="space-y-3">
-                {specs.capacity && (
-                  <div>
-                    <dt className="stage-label text-[var(--stage-text-secondary)] mb-0.5">Capacity</dt>
-                    <dd className="text-[length:var(--stage-data-size)] font-mono tabular-nums text-[var(--stage-text-primary)]">{specs.capacity.toLocaleString()}</dd>
-                  </div>
-                )}
-                {specs.load_in_notes && (
-                  <div>
-                    <dt className="stage-label text-[var(--stage-text-secondary)] mb-0.5">Load-in</dt>
-                    <dd className="text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)]">{specs.load_in_notes}</dd>
-                  </div>
-                )}
-                {specs.power_notes && (
-                  <div>
-                    <dt className="stage-label text-[var(--stage-text-secondary)] mb-0.5">Power</dt>
-                    <dd className="text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)]">{specs.power_notes}</dd>
-                  </div>
-                )}
-                {specs.stage_notes && (
-                  <div>
-                    <dt className="stage-label text-[var(--stage-text-secondary)] mb-0.5">Stage</dt>
-                    <dd className="text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)]">{specs.stage_notes}</dd>
-                  </div>
-                )}
-              </dl>
-            </div>
-          </>
-        );
-      })()}
+      {/* Venue specs render once, from VenueSpecsCompactCard inside
+          EntityOverviewCards below. This block used to render the same four
+          fields again in a different treatment, so a venue sheet showed two
+          "Venue specs" headings with the same data under each. */}
 
       {/* ── Divider before cards ── */}
       <div className="h-px bg-[var(--stage-edge-subtle)]" />

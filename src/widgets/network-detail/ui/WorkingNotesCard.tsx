@@ -36,6 +36,7 @@ import {
   updateWorkingNotes,
   type UpdateWorkingNotesPatch,
 } from '../api/update-working-notes';
+import { formatRelative } from '@/shared/lib/format-relative';
 
 export interface WorkingNotesCardProps {
   workspaceId: string;
@@ -76,7 +77,7 @@ export function WorkingNotesCard({ workspaceId, entityId }: WorkingNotesCardProp
       });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : 'Could not save.');
+      toast.error(err instanceof Error ? err.message : 'Could not save.', { duration: Infinity });
     },
   });
 
@@ -474,15 +475,3 @@ function Label({ children }: { children: React.ReactNode }) {
   );
 }
 
-function formatRelative(iso: string): string {
-  const d = new Date(iso);
-  const ms = Date.now() - d.getTime();
-  const minutes = Math.floor(ms / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}

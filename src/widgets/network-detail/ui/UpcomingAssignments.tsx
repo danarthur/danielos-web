@@ -32,12 +32,12 @@ function StatusBadge({ status }: { status: CrewScheduleEntry['status'] }) {
 
 function SkeletonRow() {
   return (
-    <div className="flex items-center justify-between py-2 animate-pulse">
+    <div className="flex items-center justify-between py-2">
       <div className="space-y-1.5 flex-1 min-w-0">
-        <div className="h-3.5 w-32 rounded bg-[var(--stage-surface-elevated)]" />
-        <div className="h-3 w-48 rounded bg-[var(--stage-surface-elevated)]" />
+        <div className="h-3.5 w-32 rounded stage-skeleton" />
+        <div className="h-3 w-48 rounded stage-skeleton" />
       </div>
-      <div className="h-5 w-16 rounded-full bg-[var(--stage-surface-elevated)]" />
+      <div className="h-5 w-16 rounded-full stage-skeleton" />
     </div>
   );
 }
@@ -139,9 +139,11 @@ export function UpcomingAssignments({ entityId }: { entityId: string }) {
                 </div>
               )}
 
+              {/* Same: a count, not a control. cursor-default was already
+                  admitting it did nothing. */}
               {hasMore && (
-                <p className="pt-2 stage-label text-[var(--stage-text-secondary)] cursor-default">
-                  +{entries.length - MAX_VISIBLE} more
+                <p className="pt-2 stage-label text-[var(--stage-text-tertiary)]">
+                  +{entries.length - MAX_VISIBLE} not shown
                 </p>
               )}
             </div>

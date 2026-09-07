@@ -60,7 +60,7 @@ function stintRange(s: EmploymentStint): string | null {
  * file" so the card can hide in the second case without flickering in the first.
  */
 function useEmploymentHistory(workspaceId: string, entityId: string) {
-  const { data } = useQuery({
+  const { data, isPending } = useQuery({
     queryKey: ['employment-history', workspaceId, entityId],
     queryFn: () => getEmploymentHistory(workspaceId, entityId),
     staleTime: 60_000,
@@ -73,6 +73,7 @@ function useEmploymentHistory(workspaceId: string, entityId: string) {
   return {
     current,
     former,
+    isPending,
     loadedAndEmpty: Boolean(history) && current.length === 0 && former.length === 0,
   };
 }
@@ -81,20 +82,20 @@ export function EmploymentCard({ workspaceId, entityId }: EmploymentCardProps) {
   const qc = useQueryClient();
   const [moving, setMoving] = React.useState(false);
 
-  const { current, former, loadedAndEmpty } = useEmploymentHistory(workspaceId, entityId);
+  const { current, former, isPending, loadedAndEmpty } = useEmploymentHistory(workspaceId, entityId);
 
   const move = useMutation({
     mutationFn: moveAffiliation,
     onSuccess: (res) => {
       if (!res.ok) {
-        toast.error(res.error);
+        toast.error(res.error, { duration: Infinity });
         return;
       }
       setMoving(false);
       qc.invalidateQueries({ queryKey: ['employment-history', workspaceId, entityId] });
       toast.success(moveResultMessage(res.rosterEdgesLeft));
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message, { duration: Infinity }),
   });
 
   // Nothing recorded either way: stay out of the way rather than render an
@@ -104,12 +105,15 @@ export function EmploymentCard({ workspaceId, entityId }: EmploymentCardProps) {
   return (
     <motion.div
       initial={false}
-      className="flex flex-col gap-3 rounded-[var(--stage-radius-card,10px)] border border-[var(--stage-border)] bg-[var(--ctx-card)] p-4"
+      className="flex flex-col gap-3 rounded-[var(--stage-radius-panel)] border border-[var(--stage-border)] bg-[var(--ctx-card)] p-4"
       data-surface="elevated"
     >
       <CardHeader canMove={current.length > 0 && !moving} onMove={() => setMoving(true)} />
 
-      <CurrentEmployers stints={current} showEmpty={!moving} />
+      {/* Absence is only assertable once the query has settled -- printing
+          "No current employer on file" while still loading states a fact we do
+          not yet have. */}
+      <CurrentEmployers stints={current} showEmpty={!moving && !isPending} />
 
       <AnimatePresence initial={false}>
         {moving && current.length > 0 && (

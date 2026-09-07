@@ -56,12 +56,12 @@ function DealRow({ deal }: { deal: EntityDeal }) {
 
 function SkeletonRow() {
   return (
-    <div className="flex items-center justify-between gap-3 py-2 animate-pulse">
+    <div className="flex items-center justify-between gap-3 py-2">
       <div className="min-w-0 flex-1 space-y-2">
-        <div className="h-4 w-3/4 rounded bg-[var(--stage-surface-elevated)]" />
-        <div className="h-4 w-16 rounded-full bg-[var(--stage-surface-elevated)]" />
+        <div className="h-4 w-3/4 rounded stage-skeleton" />
+        <div className="h-4 w-16 rounded-full stage-skeleton" />
       </div>
-      <div className="h-4 w-16 rounded bg-[var(--stage-surface-elevated)]" />
+      <div className="h-4 w-16 rounded stage-skeleton" />
     </div>
   );
 }
@@ -133,9 +133,11 @@ export function DealHistoryPanel({ entityId }: { entityId: string }) {
               <DealRow key={deal.id} deal={deal} />
             ))}
           </div>
+          {/* A count, not a control -- there is no expand behind it. Tertiary
+              so it does not read as something to click. */}
           {hiddenActiveCount > 0 && (
-            <p className="mt-1 text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
-              +{hiddenActiveCount} more
+            <p className="mt-1 stage-label text-[var(--stage-text-tertiary)]">
+              +{hiddenActiveCount} not shown
             </p>
           )}
         </>
