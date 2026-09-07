@@ -108,7 +108,7 @@ export function EntitySummaryCard({
   if (isLoading && !summary) {
     return (
       <div
-        className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-2"
+        className="rounded-[var(--stage-radius-panel)] bg-[var(--ctx-card)] p-4 space-y-2"
         data-surface="elevated"
       >
         <div className="h-3 w-3/4 rounded stage-skeleton" />
@@ -129,7 +129,7 @@ export function EntitySummaryCard({
       initial={{ opacity: 0, y: 2 }}
       animate={{ opacity: 1, y: 0 }}
       transition={STAGE_LIGHT}
-      className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-3"
+      className="rounded-[var(--stage-radius-panel)] bg-[var(--ctx-card)] p-4 space-y-3"
       data-surface="elevated"
     >
       <div className="flex items-center gap-1.5">

@@ -92,7 +92,7 @@ export function DealHistoryPanel({ entityId }: { entityId: string }) {
   // Loading
   if (deals === null) {
     return (
-      <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">
+      <div className="border-t border-[var(--stage-edge-subtle)] pt-4" data-surface="elevated">
         <h3 className="stage-label text-[var(--stage-text-secondary)] mb-3">
           Deals
         </h3>
@@ -105,23 +105,16 @@ export function DealHistoryPanel({ entityId }: { entityId: string }) {
     );
   }
 
-  // Empty
-  if (deals.length === 0) {
-    return (
-      <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">
-        <h3 className="stage-label text-[var(--stage-text-secondary)] mb-2">
-          Deals
-        </h3>
-        <p className="text-[length:var(--stage-data-size)] text-[var(--stage-text-secondary)]">No deals</p>
-      </div>
-    );
-  }
+  // Nothing to show: render nothing. Seven peer cards already do this; the two
+  // that printed an empty box were the biggest single contributor to the sheet
+  // reading as a wall of equally-important containers.
+  if (deals.length === 0) return null;
 
   const visibleActive = activeDeals.slice(0, MAX_ACTIVE_VISIBLE);
   const hiddenActiveCount = activeDeals.length - MAX_ACTIVE_VISIBLE;
 
   return (
-    <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">
+    <div className="border-t border-[var(--stage-edge-subtle)] pt-4" data-surface="elevated">
       {/* Active deals */}
       {activeDeals.length > 0 && (
         <>

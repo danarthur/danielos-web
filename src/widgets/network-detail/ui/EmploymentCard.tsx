@@ -105,8 +105,7 @@ export function EmploymentCard({ workspaceId, entityId }: EmploymentCardProps) {
   return (
     <motion.div
       initial={false}
-      className="flex flex-col gap-3 rounded-[var(--stage-radius-panel)] border border-[var(--stage-border)] bg-[var(--ctx-card)] p-4"
-      data-surface="elevated"
+      className="flex flex-col gap-3 border-t border-[var(--stage-edge-subtle)] pt-4"
     >
       <CardHeader canMove={current.length > 0 && !moving} onMove={() => setMoving(true)} />
 
@@ -260,7 +259,10 @@ function MovePicker({
       transition={STAGE_LIGHT}
       className="overflow-hidden"
     >
-      <div className="flex flex-col gap-2 rounded-[var(--stage-radius-input,6px)] border border-[var(--stage-border)] bg-[var(--ctx-well)] p-3">
+      <div
+        className="flex flex-col gap-2 rounded-[var(--stage-radius-nested)] bg-[var(--ctx-well)] p-3"
+        data-surface="surface"
+      >
         <div className="flex items-center justify-between gap-2">
           <p className="stage-label text-[var(--stage-text-secondary)]">
             Leaving <span className="text-[var(--stage-text-primary)]">{from.companyName}</span>

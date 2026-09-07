@@ -48,7 +48,7 @@ export function VenueSpecsCompactCard({ workspaceId, entityId }: VenueSpecsCompa
       initial={{ opacity: 0, y: 2 }}
       animate={{ opacity: 1, y: 0 }}
       transition={STAGE_LIGHT}
-      className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-3"
+      className="rounded-[var(--stage-radius-panel)] bg-[var(--ctx-card)] p-4 space-y-3"
       data-surface="elevated"
     >
       <h3 className="stage-label text-[var(--stage-text-secondary)]">Venue specs</h3>

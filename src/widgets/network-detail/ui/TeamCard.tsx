@@ -48,7 +48,7 @@ export function TeamCard({ workspaceId, entityId, onSeeAll }: TeamCardProps) {
   if (isLoading) {
     return (
       <div
-        className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-2"
+        className="border-t border-[var(--stage-edge-subtle)] pt-4 space-y-2"
         data-surface="elevated"
       >
         <div className="h-3 w-20 rounded stage-skeleton" />
@@ -69,7 +69,7 @@ export function TeamCard({ workspaceId, entityId, onSeeAll }: TeamCardProps) {
       initial={{ opacity: 0, y: 2 }}
       animate={{ opacity: 1, y: 0 }}
       transition={STAGE_LIGHT}
-      className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-3"
+      className="border-t border-[var(--stage-edge-subtle)] pt-4 space-y-3"
       data-surface="elevated"
     >
       <div className="flex items-center justify-between">

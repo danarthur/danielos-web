@@ -112,7 +112,7 @@ export function ReferralsCard({ workspaceId, entityId }: ReferralsCardProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={STAGE_LIGHT}
-      className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-3"
+      className="border-t border-[var(--stage-edge-subtle)] pt-4 space-y-3"
       data-surface="elevated"
     >
       <div className="flex items-center justify-between">
@@ -220,7 +220,8 @@ function ReferralForm({
       animate={{ height: 'auto', opacity: 1 }}
       exit={{ height: 0, opacity: 0 }}
       transition={STAGE_MEDIUM}
-      className="overflow-hidden rounded-lg border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] p-3 space-y-2"
+      className="overflow-hidden rounded-[var(--stage-radius-nested)] bg-[var(--ctx-well)] p-3 space-y-2"
+      data-surface="surface"
     >
       <div className="flex gap-1.5">
         {(['received', 'sent'] as const).map((d) => (
@@ -252,7 +253,7 @@ function ReferralForm({
         disabled={saving}
         className={cn(
           'w-full text-sm px-2 py-1.5 rounded-md',
-          'border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)]',
+          'border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)]',
           'text-[var(--stage-text-primary)]',
           'placeholder:text-[var(--stage-text-tertiary)]',
           'focus:outline-none focus:ring-1 focus:ring-[var(--stage-accent)]/50',
@@ -266,7 +267,7 @@ function ReferralForm({
         disabled={saving}
         className={cn(
           'w-full text-xs px-2 py-1.5 rounded-md',
-          'border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)]',
+          'border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)]',
           'text-[var(--stage-text-primary)]',
           'placeholder:text-[var(--stage-text-tertiary)]',
           'focus:outline-none focus:ring-1 focus:ring-[var(--stage-accent)]/50',

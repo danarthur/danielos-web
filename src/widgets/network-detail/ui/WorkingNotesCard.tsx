@@ -121,7 +121,7 @@ export function WorkingNotesCard({ workspaceId, entityId }: WorkingNotesCardProp
       animate={{ opacity: 1 }}
       transition={STAGE_LIGHT}
       className={cn(
-        'group rounded-xl border border-[var(--stage-edge-subtle)]',
+        'group rounded-[var(--stage-radius-panel)]',
         'bg-[var(--stage-surface-elevated)] p-4 space-y-3',
       )}
       data-surface="elevated"
@@ -373,7 +373,7 @@ function WorkingNotesEditor({
                 'border text-xs transition-colors',
                 channel === c.value
                   ? 'border-[var(--stage-accent)]/50 bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-primary)]'
-                  : 'border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]',
+                  : 'border-transparent bg-[var(--ctx-well)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]',
               )}
             >
               <c.Icon className="size-3" strokeWidth={1.5} />

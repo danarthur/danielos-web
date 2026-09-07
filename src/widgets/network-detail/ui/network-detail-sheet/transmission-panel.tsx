@@ -67,7 +67,7 @@ export function TransmissionPanel({
 
       {/* ── Partner: Ledger card ── */}
       {isPartner && (
-        <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">
+        <div className="rounded-[var(--stage-radius-panel)] bg-[var(--ctx-card)] p-4" data-surface="elevated">
           <TradeLedger details={details} />
         </div>
       )}
@@ -223,7 +223,7 @@ export function TransmissionPanel({
       {details.active_events.length > 0
         && details.entityDirectoryType !== 'person'
         && details.entityDirectoryType !== 'couple' && (
-        <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">
+        <div className="border-t border-[var(--stage-edge-subtle)] pt-4">
           <h3 className="stage-label text-[var(--stage-text-secondary)] mb-2">
             Active shows
           </h3>

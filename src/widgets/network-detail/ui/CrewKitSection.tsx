@@ -250,7 +250,7 @@ export function CrewKitSection({ entityId }: { entityId: string }) {
   if (loading) return null;
 
   return (
-    <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">
+    <div className="rounded-[var(--stage-radius-panel)] bg-[var(--ctx-card)] p-4" data-surface="elevated">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Wrench className="size-3.5 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
